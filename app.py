@@ -44,6 +44,15 @@ current_directory = os.getcwd()
 st.markdown(current_directory)
 st.markdown(os.path.expanduser("~"))
 
+assistant_id = "agent"
+agent_dir = settings.ensure_agent_dir(assistant_id)
+skills_dir = settings.ensure_user_skills_dir(assistant_id)
+project_skills_dir = settings.get_project_skills_dir()
+
+st.markdown(agent_dir)
+st.markdown(skills_dir)
+st.markdown(project_skills_dir)
+
 if "agent" not in st.session_state:
     st.session_state.agent = create_deep_agent(
         llm,
