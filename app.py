@@ -208,8 +208,17 @@ def handle_user_input(user_input):
                 # Create human message
                 human_msg = HumanMessage(content=user_input)
                 
-                # Get response from agent
-                response = st.session_state.agent.invoke({"messages": [human_msg]})
+                # Create config with thread_id for checkpointer
+                config = {
+                    "configurable": {"thread_id": "streamlit_chat"},
+                    "metadata": {"assistant_id": "agent"},
+                }
+                
+                # Get response from agent with proper config
+                response = st.session_state.agent.invoke(
+                    {"messages": [human_msg]},
+                    config=config
+                )
                 
                 # Extract assistant response
                 if response and "messages" in response:
