@@ -13,7 +13,8 @@ from langchain_core.messages import HumanMessage, ToolMessage
 from langgraph.types import Command, Interrupt
 from langgraph.checkpoint.memory import InMemorySaver
 
-# Skills will be loaded from local "skills" folder
+from deepagents_cli.skills.middleware import SkillsMiddleware
+from deepagents_cli.config import settings
 
 # Set the wide layout of the web page
 st.set_page_config(layout="wide", page_title="WEN-OKN")
@@ -29,42 +30,22 @@ if "agent" not in st.session_state:
 if "skills_loaded" not in st.session_state:
     st.session_state.skills_loaded = False
 
-# Sidebar for configuration
-with st.sidebar:
-    st.markdown("## Configuration")
-    
-    # Model settings
-    st.markdown("### Model Settings")
-    temperature = st.slider("Temperature", 0.0, 1.0, 0.3, 0.1)
-    
-    # Skills information
-    st.markdown("### Available Skills")
-    if st.session_state.skills_loaded and "available_skills" in st.session_state:
-        skills_count = len(st.session_state.available_skills)
-        st.success(f"✅ {skills_count} skills loaded from local folder")
-        
-        # Show skill list
-        if st.session_state.available_skills:
-            with st.expander("View Available Skills"):
-                for skill in st.session_state.available_skills:
-                    st.markdown(f"**{skill['name']}**")
-                    # Show first few lines of description
-                    lines = skill["description"].split('\n')[:3]
-                    for line in lines:
-                        if line.strip():
-                            st.markdown(f"  {line}")
-                    st.markdown("")
-    else:
-        st.info("🔄 Loading skills...")
+# Configuration section (moved to main area)
+with st.container():
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.markdown("### Configuration")
+    with col2:
+        temperature = st.slider("Temperature", 0.0, 1.0, 0.3, 0.1, key="temp_slider")
 
 # Initialize LLM
 @st.cache_resource
-def get_llm(temperature_value=0.3):
+def get_llm():
     return ChatOpenAI(
         model="mimo-v2-flash",
         base_url="https://api.xiaomimimo.com/v1",
         api_key=st.secrets["XIAOMI_API_KEY"],
-        temperature=temperature_value,
+        temperature=st.session_state.get("temp_slider", 0.3),
         top_p=0.95,
         stream=False,
         stop=None,
@@ -75,61 +56,57 @@ def get_llm(temperature_value=0.3):
         }
     )
 
-# Load skills from local folder
-def load_local_skills():
-    """Load skills from the local 'skills' folder"""
-    skills_dir = Path("skills")
-    
-    if not skills_dir.exists():
-        st.warning("⚠️ Skills folder not found. Some features may be limited.")
-        return []
-    
-    skills = []
-    try:
-        for skill_folder in skills_dir.iterdir():
-            if skill_folder.is_dir():
-                skill_file = skill_folder / "SKILL.md"
-                if skill_file.exists():
-                    # Read skill description
-                    with open(skill_file, 'r', encoding='utf-8') as f:
-                        skill_content = f.read()
-                    
-                    skills.append({
-                        "name": skill_folder.name,
-                        "path": str(skill_folder),
-                        "description": skill_content
-                    })
-        
-        st.success(f"✅ Loaded {len(skills)} skills from local folder")
-        return skills
-        
-    except Exception as e:
-        st.error(f"❌ Error loading skills: {str(e)}")
-        return []
-
 # Initialize agent with skills
 def initialize_agent():
     if st.session_state.agent is None:
-        llm = get_llm(temperature)
+        llm = get_llm()
         
-        # Load skills from local folder
-        skills = load_local_skills()
+        # Setup directories like the CLI does
+        assistant_id = "agent"
+        current_directory = os.getcwd()
         
-        # Build skills-aware system prompt
-        skills_info = ""
-        if skills:
-            skills_info = "\n## Available Skills:\n"
-            for skill in skills:
-                # Extract first line of skill description as summary
-                lines = skill["description"].split('\n')
-                summary = lines[0] if lines else skill["name"]
-                skills_info += f"- **{skill['name']}**: {summary}\n"
+        # For Streamlit Cloud, use local skills folder
+        local_skills_dir = Path(current_directory) / "skills"
         
-        system_prompt = f"""
+        # Try to use local skills folder first, fallback to CLI settings
+        if local_skills_dir.exists():
+            skills_dir = str(local_skills_dir)
+            project_skills_dir = None
+            st.success(f"✅ Using local skills folder: {skills_dir}")
+        else:
+            # Fallback to CLI settings
+            skills_dir = settings.ensure_user_skills_dir(assistant_id)
+            project_skills_dir = settings.get_project_skills_dir()
+            st.info(f"📁 Using CLI skills directory: {skills_dir}")
+        
+        # Initialize skills middleware
+        skills_middleware = SkillsMiddleware(
+            skills_dir=skills_dir,
+            assistant_id=assistant_id,
+            project_skills_dir=project_skills_dir,
+        )
+        
+        # Create middleware like the CLI
+        agent_middleware = [
+            skills_middleware,
+            ShellToolMiddleware(
+                workspace_root=current_directory,
+                execution_policy=HostExecutionPolicy(),
+                env=os.environ,
+            ),
+        ]
+        
+        # Enhanced system prompt
+        system_prompt = """
         You are WEN-OKN, a helpful AI assistant with access to specialized skills for data analysis and research.
         
         ## Your Capabilities
-        You have access to various skills for geographic data analysis, environmental information, infrastructure queries, and statistical research.{skills_info}
+        You have access to various skills for:
+        - Geographic data analysis (counties, states, census tracts, watersheds)
+        - Environmental data (PFAS contamination, water systems, facilities)
+        - Infrastructure data (power plants, dams, coal mines)
+        - Statistical data from Google Data Commons
+        - File operations and web research
         
         ## How to Help Users
         1. **Understand their needs** - Ask clarifying questions if needed
@@ -143,31 +120,68 @@ def initialize_agent():
         - Never use relative paths
         
         ## Skills Usage
-        - Skills are located in the local 'skills' folder
-        - Each skill has its own directory with a SKILL.md file
+        - Skills are automatically loaded and available as tools
         - Use skills when the user's request matches their domain
-        - Always read the skill's SKILL.md file before using it
+        - The SkillsMiddleware handles skill discovery and execution
         
         Always be helpful, accurate, and explain your reasoning when using specialized skills.
         """
         
-        # Create agent with basic middleware (skills will be accessed via file system)
+        # Create the agent with custom tools and skills middleware
         st.session_state.agent = create_deep_agent(
             llm,
             system_prompt=system_prompt,
-            middleware=[
-                ShellToolMiddleware(
-                    execution_policy=HostExecutionPolicy.ALLOW
-                )
-            ]
+            middleware=agent_middleware,
         )
         
+        # Add checkpointer like the CLI
+        st.session_state.agent.checkpointer = InMemorySaver()
+        
         # Store skills info for reference
-        st.session_state.available_skills = skills
         st.session_state.skills_loaded = True
+        st.session_state.skills_directory = skills_dir
 
 # Initialize agent
 initialize_agent()
+
+# Skills information section
+if st.session_state.skills_loaded and "skills_directory" in st.session_state:
+    with st.expander("📋 Available Skills", expanded=False):
+        skills_dir = st.session_state.skills_directory
+        st.success(f"✅ Skills loaded from: {skills_dir}")
+        
+        # Show available skills from directory
+        try:
+            skills_path = Path(skills_dir)
+            if skills_path.exists():
+                skill_folders = [f for f in skills_path.iterdir() if f.is_dir() and (f / "SKILL.md").exists()]
+                
+                if skill_folders:
+                    cols = st.columns(min(3, len(skill_folders)))
+                    for i, skill_folder in enumerate(skill_folders):
+                        with cols[i % 3]:
+                            skill_name = skill_folder.name
+                            skill_file = skill_folder / "SKILL.md"
+                            
+                            st.markdown(f"**{skill_name}**")
+                            
+                            # Read first few lines of skill description
+                            try:
+                                with open(skill_file, 'r', encoding='utf-8') as f:
+                                    lines = f.readlines()[:2]
+                                    for line in lines:
+                                        if line.strip() and not line.startswith('#'):
+                                            st.markdown(f"  {line.strip()}")
+                            except:
+                                st.markdown("  *Skill description unavailable*")
+                else:
+                    st.info("No skills found in the skills directory")
+            else:
+                st.warning("Skills directory not found")
+        except Exception as e:
+            st.error(f"Error reading skills: {str(e)}")
+elif not st.session_state.skills_loaded:
+    st.info("🔄 Loading skills...")
 
 # Display chat messages
 def display_messages():
