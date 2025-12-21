@@ -192,8 +192,45 @@ def display_messages():
             else:
                 st.markdown(message["content"])
 
-# Handle user input
-def handle_user_input(user_input):
+# Tool icons for display
+TOOL_ICONS = {
+    "read_file": "📖",
+    "write_file": "✏️",
+    "edit_file": "✂️",
+    "ls": "📁",
+    "glob": "🔍",
+    "grep": "🔎",
+    "shell": "⚡",
+    "execute": "🔧",
+    "web_search": "🌐",
+    "http_request": "🌍",
+    "task": "🤖",
+    "write_todos": "📋",
+}
+
+def format_tool_display(tool_name: str, args: dict) -> str:
+    """Format tool call for display."""
+    if tool_name == "read_file":
+        file_path = args.get("file_path", "unknown")
+        return f"Read file: {file_path}"
+    elif tool_name == "write_file":
+        file_path = args.get("file_path", "unknown")
+        content_preview = args.get("content", "")[:50]
+        return f"Write file: {file_path} ({content_preview}...)"
+    elif tool_name == "shell":
+        command = args.get("command", "unknown")
+        return f"Shell: {command}"
+    elif tool_name == "ls":
+        path = args.get("path", "unknown")
+        return f"List directory: {path}"
+    elif tool_name == "write_todos":
+        todos = args.get("todos", [])
+        return f"Update todos ({len(todos)} items)"
+    else:
+        return f"{tool_name}: {args}"
+
+# Handle user input with detailed execution
+async def handle_user_input_detailed(user_input):
     # Add user message to chat
     st.session_state.messages.append({"role": "user", "content": user_input})
     
@@ -201,41 +238,208 @@ def handle_user_input(user_input):
     with st.chat_message("user"):
         st.markdown(user_input)
     
-    # Get assistant response
+    # Get assistant response with detailed execution
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            try:
-                # Create human message
-                human_msg = HumanMessage(content=user_input)
+        # Create a placeholder for streaming content
+        response_placeholder = st.empty()
+        tool_calls_container = st.container()
+        
+        try:
+            # Create config with thread_id for checkpointer
+            config = {
+                "configurable": {"thread_id": "streamlit_chat"},
+                "metadata": {"assistant_id": "agent"},
+            }
+            
+            stream_input = {"messages": [{"role": "user", "content": user_input}]}
+            
+            has_responded = False
+            pending_text = ""
+            tool_call_buffers = {}
+            displayed_tool_ids = set()
+            tool_calls_html = ""
+            
+            while True:
+                interrupt_occurred = False
+                hitl_response = {}
+                pending_interrupts = {}
                 
-                # Create config with thread_id for checkpointer
-                config = {
-                    "configurable": {"thread_id": "streamlit_chat"},
-                    "metadata": {"assistant_id": "agent"},
-                }
+                async for chunk in st.session_state.agent.astream(
+                    stream_input,
+                    stream_mode=["messages", "updates"],
+                    subgraphs=True,
+                    config=config,
+                    durability="exit",
+                ):
+                    if not isinstance(chunk, tuple) or len(chunk) != 3:
+                        continue
+                    
+                    _namespace, current_stream_mode, data = chunk
+                    
+                    # Handle UPDATES stream - for interrupts and todos
+                    if current_stream_mode == "updates":
+                        if isinstance(data, dict):
+                            # Check for interrupts
+                            if "__interrupt__" in data:
+                                interrupts = data["__interrupt__"]
+                                if interrupts:
+                                    for interrupt_obj in interrupts:
+                                        pending_interrupts[interrupt_obj.id] = interrupt_obj.value
+                                        interrupt_occurred = True
+                            
+                            # Check for todo updates
+                            chunk_data = next(iter(data.values())) if data else None
+                            if chunk_data and isinstance(chunk_data, dict) and "todos" in chunk_data:
+                                new_todos = chunk_data["todos"]
+                                with tool_calls_container:
+                                    st.markdown("### 📋 Todo List Updated:")
+                                    for i, todo in enumerate(new_todos, 1):
+                                        status_icon = "✅" if todo["status"] == "completed" else "🔄" if todo["status"] == "in_progress" else "⏳"
+                                        st.markdown(f"  {i}. {status_icon} {todo['content']}")
+                    
+                    # Handle MESSAGES stream - for content and tool calls
+                    elif current_stream_mode == "messages":
+                        if not isinstance(data, tuple) or len(data) != 2:
+                            continue
+                        
+                        message, _metadata = data
+                        
+                        if isinstance(message, HumanMessage):
+                            continue
+                        
+                        if isinstance(message, ToolMessage):
+                            # Show tool results
+                            tool_name = getattr(message, "name", "")
+                            tool_content = getattr(message, "content", "")
+                            tool_status = getattr(message, "status", "success")
+                            
+                            if tool_name == "shell" and tool_status != "success":
+                                with tool_calls_container:
+                                    st.error(f"❌ Shell command failed: {tool_content}")
+                            elif tool_content and isinstance(tool_content, str):
+                                stripped = tool_content.lstrip()
+                                if stripped.lower().startswith("error"):
+                                    with tool_calls_container:
+                                        st.error(f"❌ Tool error: {tool_content}")
+                            
+                            continue
+                        
+                        # Check if this is an AIMessageChunk
+                        if not hasattr(message, "content_blocks"):
+                            continue
+                        
+                        # Process content blocks
+                        for block in message.content_blocks:
+                            block_type = block.get("type")
+                            
+                            # Handle text blocks
+                            if block_type == "text":
+                                text = block.get("text", "")
+                                if text:
+                                    if not has_responded:
+                                        has_responded = True
+                                    pending_text += text
+                                    # Update the placeholder with new text
+                                    response_placeholder.markdown(pending_text)
+                            
+                            # Handle tool call chunks
+                            elif block_type in ("tool_call_chunk", "tool_call"):
+                                chunk_name = block.get("name")
+                                chunk_args = block.get("args")
+                                chunk_id = block.get("id")
+                                chunk_index = block.get("index")
+                                
+                                # Use index as stable buffer key; fall back to id if needed
+                                buffer_key = chunk_index if chunk_index is not None else chunk_id if chunk_id is not None else f"unknown-{len(tool_call_buffers)}"
+                                
+                                buffer = tool_call_buffers.setdefault(
+                                    buffer_key,
+                                    {"name": None, "id": None, "args": None, "args_parts": []},
+                                )
+                                
+                                if chunk_name:
+                                    buffer["name"] = chunk_name
+                                if chunk_id:
+                                    buffer["id"] = chunk_id
+                                
+                                if isinstance(chunk_args, dict):
+                                    buffer["args"] = chunk_args
+                                    buffer["args_parts"] = []
+                                elif isinstance(chunk_args, str):
+                                    if chunk_args:
+                                        parts = buffer.setdefault("args_parts", [])
+                                        if not parts or chunk_args != parts[-1]:
+                                            parts.append(chunk_args)
+                                        buffer["args"] = "".join(parts)
+                                elif chunk_args is not None:
+                                    buffer["args"] = chunk_args
+                                
+                                buffer_name = buffer.get("name")
+                                buffer_id = buffer.get("id")
+                                if buffer_name is None:
+                                    continue
+                                
+                                parsed_args = buffer.get("args")
+                                if isinstance(parsed_args, str):
+                                    if not parsed_args:
+                                        continue
+                                    try:
+                                        parsed_args = json.loads(parsed_args)
+                                    except json.JSONDecodeError:
+                                        continue
+                                elif parsed_args is None:
+                                    continue
+                                
+                                # Ensure args are in dict form
+                                if not isinstance(parsed_args, dict):
+                                    parsed_args = {"value": parsed_args}
+                                
+                                # Display the tool call
+                                if buffer_id is not None and buffer_id not in displayed_tool_ids:
+                                    displayed_tool_ids.add(buffer_id)
+                                    icon = TOOL_ICONS.get(buffer_name, "🔧")
+                                    display_str = format_tool_display(buffer_name, parsed_args)
+                                    
+                                    with tool_calls_container:
+                                        st.markdown(f"  {icon} {display_str}")
+                                
+                                tool_call_buffers.pop(buffer_key, None)
+                        
+                        if getattr(message, "chunk_position", None) == "last":
+                            if pending_text:
+                                pending_text = ""
                 
-                # Get response from agent with proper config
-                response = st.session_state.agent.invoke(
-                    {"messages": [human_msg]},
-                    config=config
-                )
-                
-                # Extract assistant response
-                if response and "messages" in response:
-                    assistant_response = response["messages"][-1].content
+                # Handle interrupts if they occurred
+                if interrupt_occurred:
+                    # Auto-approve all tool actions for Streamlit
+                    for interrupt_id, hitl_request in pending_interrupts.items():
+                        decisions = []
+                        for action_request in hitl_request["action_requests"]:
+                            description = action_request.get("description", "tool action")
+                            with tool_calls_container:
+                                st.info(f"⚡ Auto-approving: {description}")
+                            decisions.append({"type": "approve"})
+                        hitl_response[interrupt_id] = {"decisions": decisions}
+                    
+                    # Resume the agent with the human decision
+                    stream_input = Command(resume=hitl_response)
+                    continue
                 else:
-                    assistant_response = "I apologize, but I couldn't generate a response. Please try again."
-                
-                # Display assistant response
-                st.markdown(assistant_response)
-                
-                # Add to message history
-                st.session_state.messages.append({"role": "assistant", "content": assistant_response})
-                
-            except Exception as e:
-                error_message = f"An error occurred: {str(e)}"
-                st.error(error_message)
-                st.session_state.messages.append({"role": "assistant", "content": error_message})
+                    break
+            
+            # Add final response to message history
+            if pending_text:
+                st.session_state.messages.append({"role": "assistant", "content": pending_text})
+            
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            st.error(error_message)
+            st.session_state.messages.append({"role": "assistant", "content": error_message})
+
+# Handle user input (wrapper for async function)
+def handle_user_input(user_input):
+    # Run the async function
+    asyncio.run(handle_user_input_detailed(user_input))
 
 # Main chat interface
 st.markdown("## Chat Interface")
@@ -254,3 +458,25 @@ if st.button("Clear Chat"):
     st.session_state.messages = []
     st.rerun()
 
+# Footer with helpful tips
+st.markdown("---")
+st.markdown("### 💡 Tips for using WEN-OKN:")
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("**🗺️ Geographic Data**")
+    st.markdown("Ask about counties, states, watersheds, or environmental data by location")
+
+with col2:
+    st.markdown("**🏭 Infrastructure**")
+    st.markdown("Query power plants, dams, coal mines, and other facilities")
+
+with col3:
+    st.markdown("**📊 Statistics**")
+    st.markdown("Get demographic, economic, and environmental statistics")
+
+st.markdown("**Example queries:**")
+st.markdown("- \"Show me power plants in California\"")
+st.markdown("- \"What are the PFAS contamination sites in Maine?\"")
+st.markdown("- \"Get demographic data for New York County\"")
+st.markdown("- \"Find dams in the Colorado River watershed\"")
