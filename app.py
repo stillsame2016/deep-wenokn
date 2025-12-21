@@ -40,6 +40,8 @@ if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 if "last_geodataframe" not in st.session_state:
     st.session_state.last_geodataframe = None
+if "last_geojson_file" not in st.session_state:
+    st.session_state.last_geojson_file = None
 
 # Configuration section
 with st.container():
@@ -209,18 +211,44 @@ def display_geodataframe_map(gdf, title="Geographic Data"):
 # Function to check for and display GeoJSON files
 def check_and_display_geojson_files():
     """Check for GeoJSON files created during execution and display them."""
-    tmp_dir = Path("/tmp")
-    geojson_files = list(tmp_dir.glob("*.geojson"))
+    if not GEOPANDAS_AVAILABLE:
+        st.warning("⚠️ GeoPandas not installed. Cannot display maps. Install with: `pip install geopandas`")
+        return
     
-    if geojson_files and GEOPANDAS_AVAILABLE:
-        for geojson_file in geojson_files:
+    tmp_dir = Path("/tmp")
+    
+    try:
+        geojson_files = sorted(tmp_dir.glob("*.geojson"), key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        if geojson_files:
+            # Display the most recent GeoJSON file
+            most_recent = geojson_files[0]
+            
             try:
-                gdf = gpd.read_file(geojson_file)
+                gdf = gpd.read_file(most_recent)
                 if gdf is not None and len(gdf) > 0:
-                    display_geodataframe_map(gdf, title=f"Data from {geojson_file.name}")
+                    display_geodataframe_map(gdf, title=f"📍 {most_recent.stem.replace('_', ' ').title()}")
                     st.session_state.last_geodataframe = gdf
+                    st.session_state.last_geojson_file = str(most_recent)
+                    
+                    # Show info about other files if they exist
+                    if len(geojson_files) > 1:
+                        with st.expander(f"📁 {len(geojson_files)-1} other GeoJSON file(s) available"):
+                            for gf in geojson_files[1:]:
+                                st.text(f"• {gf.name}")
+                else:
+                    st.warning(f"⚠️ GeoJSON file {most_recent.name} is empty")
             except Exception as e:
-                st.error(f"Could not read {geojson_file.name}: {str(e)}")
+                st.error(f"❌ Could not read {most_recent.name}: {str(e)}")
+                import traceback
+                with st.expander("🔍 Error Details"):
+                    st.code(traceback.format_exc())
+        else:
+            # No GeoJSON files found - this is OK, just don't show anything
+            pass
+            
+    except Exception as e:
+        st.error(f"❌ Error checking for GeoJSON files: {str(e)}")
 
 # Initialize agent
 def initialize_agent():
@@ -598,7 +626,7 @@ def handle_user_input(user_input):
 st.markdown("## 💬 Chat Interface")
 
 # Control buttons
-col1, col2, col3 = st.columns([5, 1, 1])
+col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
 with col2:
     if st.button("🗑️ Clear", use_container_width=True):
         st.session_state.messages = []
@@ -606,10 +634,36 @@ with col2:
         st.rerun()
 with col3:
     if st.button("🗺️ Show Last Map", use_container_width=True):
-        if st.session_state.last_geodataframe is not None:
+        if st.session_state.last_geojson_file and Path(st.session_state.last_geojson_file).exists():
+            try:
+                gdf = gpd.read_file(st.session_state.last_geojson_file)
+                display_geodataframe_map(gdf, f"Map: {Path(st.session_state.last_geojson_file).stem.replace('_', ' ').title()}")
+            except Exception as e:
+                st.error(f"Error loading map: {e}")
+        elif st.session_state.last_geodataframe is not None:
             display_geodataframe_map(st.session_state.last_geodataframe, "Last Query Results")
         else:
-            st.warning("No map data available yet")
+            st.warning("No map data available yet. Run a geographic query first!")
+with col4:
+    if st.button("📂 Browse Maps", use_container_width=True):
+        tmp_dir = Path("/tmp")
+        geojson_files = sorted(tmp_dir.glob("*.geojson"), key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        if geojson_files:
+            st.markdown("### 📂 Available GeoJSON Files")
+            for gf in geojson_files:
+                col_a, col_b = st.columns([3, 1])
+                with col_a:
+                    st.text(f"📄 {gf.name}")
+                with col_b:
+                    if st.button("View", key=f"view_{gf.name}"):
+                        try:
+                            gdf = gpd.read_file(gf)
+                            display_geodataframe_map(gdf, f"{gf.stem.replace('_', ' ').title()}")
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+        else:
+            st.info("No GeoJSON files found in /tmp")
 
 # Display existing messages
 display_messages()
