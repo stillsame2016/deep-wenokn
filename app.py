@@ -11,11 +11,17 @@ from langchain.agents.middleware import (
 )
 from langchain_core.messages import HumanMessage, ToolMessage, AIMessage
 from langgraph.types import Command
-# REMOVED: InMemorySaver - this was causing serialization issues
-# We'll manage conversation state manually in Streamlit session state
 
 from deepagents_cli.skills.middleware import SkillsMiddleware
 from deepagents_cli.config import settings
+
+# Import mapping libraries
+try:
+    import geopandas as gpd
+    import pandas as pd
+    GEOPANDAS_AVAILABLE = True
+except ImportError:
+    GEOPANDAS_AVAILABLE = False
 
 # Set the wide layout of the web page
 st.set_page_config(layout="wide", page_title="WEN-OKN")
@@ -32,6 +38,8 @@ if "skills_loaded" not in st.session_state:
     st.session_state.skills_loaded = False
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
+if "last_geodataframe" not in st.session_state:
+    st.session_state.last_geodataframe = None
 
 # Configuration section
 with st.container():
@@ -41,7 +49,7 @@ with st.container():
     with col2:
         temperature = st.slider("Temperature", 0.0, 1.0, 0.3, 0.1, key="temp_slider")
 
-# Initialize LLM - removed cache to allow dynamic temperature updates
+# Initialize LLM
 def get_llm():
     return ChatOpenAI(
         model="mimo-v2-flash",
@@ -58,7 +66,163 @@ def get_llm():
         }
     )
 
-# Initialize agent with working skills middleware
+# Helper function to display GeoDataFrame on map
+def display_geodataframe_map(gdf, title="Geographic Data"):
+    """Display a GeoDataFrame on an interactive map."""
+    if gdf is None or len(gdf) == 0:
+        st.warning("No geographic data to display")
+        return
+    
+    try:
+        # Ensure we have a geometry column
+        if 'geometry' not in gdf.columns:
+            st.error("No geometry column found in the data")
+            return
+        
+        # Convert to EPSG:4326 (WGS84) if not already
+        if gdf.crs and gdf.crs.to_epsg() != 4326:
+            gdf = gdf.to_crs(epsg=4326)
+        
+        # Get bounds for the map
+        bounds = gdf.total_bounds  # [minx, miny, maxx, maxy]
+        center_lat = (bounds[1] + bounds[3]) / 2
+        center_lon = (bounds[0] + bounds[2]) / 2
+        
+        # Calculate zoom level based on bounds
+        lat_diff = bounds[3] - bounds[1]
+        lon_diff = bounds[2] - bounds[0]
+        max_diff = max(lat_diff, lon_diff)
+        
+        if max_diff > 10:
+            zoom = 5
+        elif max_diff > 5:
+            zoom = 6
+        elif max_diff > 2:
+            zoom = 7
+        elif max_diff > 1:
+            zoom = 8
+        else:
+            zoom = 9
+        
+        # Create a container for the map
+        with st.container():
+            st.markdown(f"#### 🗺️ {title}")
+            
+            # Display summary stats
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Features", len(gdf))
+            with col2:
+                st.metric("Center Lat", f"{center_lat:.4f}")
+            with col3:
+                st.metric("Center Lon", f"{center_lon:.4f}")
+            
+            # Try to use pydeck for better visualization
+            try:
+                import pydeck as pdk
+                
+                # Convert to GeoJSON
+                geojson = json.loads(gdf.to_json())
+                
+                # Create pydeck layer
+                layer = pdk.Layer(
+                    "GeoJsonLayer",
+                    geojson,
+                    opacity=0.6,
+                    stroked=True,
+                    filled=True,
+                    extruded=False,
+                    wireframe=True,
+                    get_fill_color=[0, 100, 200, 140],
+                    get_line_color=[255, 255, 255],
+                    line_width_min_pixels=1,
+                    pickable=True,
+                )
+                
+                # Set the viewport
+                view_state = pdk.ViewState(
+                    latitude=center_lat,
+                    longitude=center_lon,
+                    zoom=zoom,
+                    pitch=0,
+                )
+                
+                # Render the map
+                r = pdk.Deck(
+                    layers=[layer],
+                    initial_view_state=view_state,
+                    tooltip={"text": "{properties}"},
+                    map_style="mapbox://styles/mapbox/light-v10",
+                )
+                
+                st.pydeck_chart(r)
+                
+            except ImportError:
+                # Fallback to simpler map visualization
+                # Extract centroids for point-based map
+                gdf_centroids = gdf.copy()
+                gdf_centroids['geometry'] = gdf_centroids.geometry.centroid
+                
+                # Create dataframe with lat/lon
+                map_df = pd.DataFrame({
+                    'lat': gdf_centroids.geometry.y,
+                    'lon': gdf_centroids.geometry.x,
+                })
+                
+                # Use Streamlit's built-in map
+                st.map(map_df, zoom=zoom)
+            
+            # Display attribute table
+            with st.expander("📊 View Attribute Table"):
+                # Drop geometry for display
+                display_df = gdf.drop(columns=['geometry'])
+                st.dataframe(display_df, use_container_width=True)
+            
+            # Download options
+            col1, col2 = st.columns(2)
+            with col1:
+                # GeoJSON download
+                geojson_str = gdf.to_json()
+                st.download_button(
+                    label="📥 Download as GeoJSON",
+                    data=geojson_str,
+                    file_name="geographic_data.geojson",
+                    mime="application/json",
+                )
+            with col2:
+                # CSV download (without geometry)
+                csv_df = gdf.drop(columns=['geometry'])
+                csv_str = csv_df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download as CSV",
+                    data=csv_str,
+                    file_name="geographic_data.csv",
+                    mime="text/csv",
+                )
+    
+    except Exception as e:
+        st.error(f"Error displaying map: {str(e)}")
+        import traceback
+        with st.expander("🔍 Error Details"):
+            st.code(traceback.format_exc())
+
+# Function to check for and display GeoJSON files
+def check_and_display_geojson_files():
+    """Check for GeoJSON files created during execution and display them."""
+    tmp_dir = Path("/tmp")
+    geojson_files = list(tmp_dir.glob("*.geojson"))
+    
+    if geojson_files and GEOPANDAS_AVAILABLE:
+        for geojson_file in geojson_files:
+            try:
+                gdf = gpd.read_file(geojson_file)
+                if gdf is not None and len(gdf) > 0:
+                    display_geodataframe_map(gdf, title=f"Data from {geojson_file.name}")
+                    st.session_state.last_geodataframe = gdf
+            except Exception as e:
+                st.error(f"Could not read {geojson_file.name}: {str(e)}")
+
+# Initialize agent
 def initialize_agent():
     if st.session_state.agent is None:
         try:
@@ -96,7 +260,7 @@ def initialize_agent():
                 ),
             ]
             
-            # Improved system prompt
+            # Enhanced system prompt with map visualization instructions
             system_prompt = """You are WEN-OKN, a geographic data assistant specializing in spatial analysis.
 
 ## CORE CAPABILITIES:
@@ -113,41 +277,44 @@ You have access to specialized geographic data skills that return GeoDataFrames:
 
 1. **For geographic queries**: 
    - Use the appropriate skill to fetch data
+   - Save results to /tmp as GeoJSON files (e.g., /tmp/ross_county.geojson)
+   - The UI will automatically detect and display GeoJSON files as interactive maps
    - Filter/analyze the GeoDataFrame as needed
-   - Create visualizations using streamlit
    - Explain your findings clearly
 
-2. **For data exploration**:
+2. **IMPORTANT - Always save geographic results**:
+   - After fetching data, ALWAYS save it to a GeoJSON file in /tmp
+   - Example: gdf.to_file('/tmp/county_data.geojson', driver='GeoJSON')
+   - The system will automatically display it on a map
+
+3. **For data exploration**:
    - Show relevant attributes and statistics
    - Create maps when appropriate
    - Provide context about the data
 
-3. **Best Practices**:
+4. **Best Practices**:
    - Always confirm what data you're retrieving
    - Explain filtering/analysis steps
-   - Present results visually when possible
+   - Save results to GeoJSON for automatic map display
    - Keep responses concise but informative
 
 ## EXAMPLE WORKFLOW:
 User: "Find Ross county in Ohio"
 Your approach:
 1. "I'll retrieve US counties data and filter for Ross County in Ohio"
-2. Use us_counties skill
+2. Use us_counties skill or SPARQL query
 3. Filter: counties[(counties['NAME'] == 'Ross') & (counties['STATE_NAME'] == 'Ohio')]
-4. Display on map with st.map()
-5. Explain what you found
+4. Save to /tmp/ross_county.geojson
+5. Explain what you found (the UI will show the map automatically)
 
-Remember: Skills are tools - use them directly, don't overcomplicate!"""
+Remember: ALWAYS save geographic results to /tmp/*.geojson files for automatic visualization!"""
             
-            # Create the agent WITHOUT checkpointer to avoid serialization issues
+            # Create the agent WITHOUT checkpointer
             st.session_state.agent = create_deep_agent(
                 llm,
                 system_prompt=system_prompt,
                 middleware=agent_middleware,
             )
-            
-            # DO NOT add checkpointer - it causes msgpack serialization errors
-            # We'll manage conversation state manually via st.session_state
             
             # Store skills info
             st.session_state.skills_loaded = True
@@ -189,6 +356,9 @@ if st.session_state.skills_loaded and "skills_directory" in st.session_state:
         st.markdown("- \"Show power plants in California\"")
         st.markdown("- \"Display watersheds in Colorado\"")
         
+        if not GEOPANDAS_AVAILABLE:
+            st.warning("⚠️ GeoPandas not available. Install with: `pip install geopandas`")
+        
 elif not st.session_state.skills_loaded:
     st.info("🔄 Loading skills...")
 
@@ -225,7 +395,6 @@ def format_tool_display(tool_name: str, args: dict) -> str:
         return f"Writing: {file_path}"
     elif tool_name == "shell":
         command = args.get("command", "unknown")
-        # Truncate long commands
         if len(command) > 60:
             command = command[:57] + "..."
         return f"Executing: {command}"
@@ -235,7 +404,6 @@ def format_tool_display(tool_name: str, args: dict) -> str:
     elif tool_name in ["us_counties", "us_states", "power_plants", "dams", "watersheds", "rivers", "census_tracts"]:
         return f"Fetching {tool_name.replace('_', ' ').title()} data"
     else:
-        # Truncate args if too long
         args_str = str(args)
         if len(args_str) > 100:
             args_str = args_str[:97] + "..."
@@ -247,7 +415,7 @@ def display_messages():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-# Handle user input - FIXED VERSION without checkpointer
+# Handle user input - with automatic map display
 async def handle_user_input_async(user_input):
     # Add user message to chat
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -262,17 +430,12 @@ async def handle_user_input_async(user_input):
         tool_calls_container = st.container()
         
         try:
-            # CRITICAL FIX: Don't use config with thread_id since we removed the checkpointer
-            # This was causing the msgpack serialization error
             config = {
                 "metadata": {"assistant_id": "agent"},
             }
             
-            # Include conversation history for context
-            # Build messages array with history
+            # Build messages with history
             messages_with_history = []
-            
-            # Add last few exchanges for context (limit to last 10 messages to avoid context overflow)
             recent_messages = st.session_state.messages[-10:] if len(st.session_state.messages) > 10 else st.session_state.messages
             for msg in recent_messages:
                 messages_with_history.append({
@@ -280,7 +443,6 @@ async def handle_user_input_async(user_input):
                     "content": msg["content"]
                 })
             
-            # Prepare input
             stream_input = {"messages": messages_with_history}
             
             accumulated_text = ""
@@ -294,23 +456,18 @@ async def handle_user_input_async(user_input):
                     config=config,
                     stream_mode="messages",
                 ):
-                    # Handle different event types
                     if isinstance(event, tuple) and len(event) >= 2:
                         message, metadata = event[0], event[1] if len(event) > 1 else {}
                         
-                        # Skip human messages
                         if isinstance(message, HumanMessage):
                             continue
                         
-                        # Handle AI messages with content
                         if isinstance(message, AIMessage):
-                            # Extract text content
                             if hasattr(message, 'content') and isinstance(message.content, str):
                                 if message.content:
                                     accumulated_text += message.content
                                     response_placeholder.markdown(accumulated_text)
                             
-                            # Handle tool calls
                             if hasattr(message, 'tool_calls') and message.tool_calls:
                                 for tool_call in message.tool_calls:
                                     tool_id = tool_call.get('id')
@@ -325,16 +482,13 @@ async def handle_user_input_async(user_input):
                                         with tool_calls_container:
                                             st.info(f"{icon} {display_str}")
                                         
-                                        # Add a small delay to prevent UI overwhelming
                                         if tool_call_count % 5 == 0:
                                             await asyncio.sleep(0.1)
                         
-                        # Handle tool messages
                         elif isinstance(message, ToolMessage):
                             tool_name = getattr(message, "name", "")
                             tool_content = getattr(message, "content", "")
                             
-                            # Show errors prominently
                             if isinstance(tool_content, str) and (
                                 tool_content.lower().startswith("error") or
                                 "failed" in tool_content.lower()
@@ -343,7 +497,6 @@ async def handle_user_input_async(user_input):
                                     st.error(f"❌ {tool_name}: {tool_content}")
             
             except Exception as stream_error:
-                # If streaming fails, try to get a response without streaming
                 st.warning("⚠️ Streaming failed, trying direct invocation...")
                 
                 result = await st.session_state.agent.ainvoke(
@@ -351,7 +504,6 @@ async def handle_user_input_async(user_input):
                     config=config,
                 )
                 
-                # Extract response from result
                 if isinstance(result, dict) and "messages" in result:
                     last_message = result["messages"][-1]
                     if hasattr(last_message, 'content') and isinstance(last_message.content, str):
@@ -364,30 +516,29 @@ async def handle_user_input_async(user_input):
             if accumulated_text:
                 st.session_state.messages.append({"role": "assistant", "content": accumulated_text})
             else:
-                # If no text was accumulated, show a default message
-                default_msg = "✅ I've processed your request. Please check the tool outputs above for results."
+                default_msg = "✅ I've processed your request. Please check the outputs above for results."
                 response_placeholder.markdown(default_msg)
                 st.session_state.messages.append({"role": "assistant", "content": default_msg})
+            
+            # IMPORTANT: Check for and display any GeoJSON files created
+            check_and_display_geojson_files()
             
         except Exception as e:
             error_message = f"❌ An error occurred: {str(e)}"
             st.error(error_message)
-            # Show the full traceback for debugging
             import traceback
             with st.expander("🔍 Error Details"):
                 st.code(traceback.format_exc())
             st.session_state.messages.append({"role": "assistant", "content": error_message})
 
-# Synchronous wrapper for async function
+# Synchronous wrapper
 def handle_user_input(user_input):
     try:
         asyncio.run(handle_user_input_async(user_input))
     except RuntimeError as e:
-        # Handle "asyncio.run() cannot be called from a running event loop"
         if "cannot be called from a running event loop" in str(e):
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                # Create a task instead
                 import nest_asyncio
                 nest_asyncio.apply()
                 asyncio.run(handle_user_input_async(user_input))
@@ -399,19 +550,25 @@ def handle_user_input(user_input):
 # Main chat interface
 st.markdown("## 💬 Chat Interface")
 
-# Add a button to clear conversation history
-col1, col2 = st.columns([6, 1])
+# Control buttons
+col1, col2, col3 = st.columns([5, 1, 1])
 with col2:
-    if st.button("🗑️ Clear Chat", use_container_width=True):
+    if st.button("🗑️ Clear", use_container_width=True):
         st.session_state.messages = []
         st.session_state.conversation_history = []
         st.rerun()
+with col3:
+    if st.button("🗺️ Show Last Map", use_container_width=True):
+        if st.session_state.last_geodataframe is not None:
+            display_geodataframe_map(st.session_state.last_geodataframe, "Last Query Results")
+        else:
+            st.warning("No map data available yet")
 
 # Display existing messages
 display_messages()
 
 # Chat input
-user_input = st.chat_input("Ask me about geographic data, counties, states, power plants, watersheds...")
+user_input = st.chat_input("Ask about geographic data: counties, states, power plants, watersheds...")
 
 if user_input:
     handle_user_input(user_input)
