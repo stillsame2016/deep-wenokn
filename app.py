@@ -38,22 +38,22 @@ llm = ChatOpenAI(
         }
     )
 
-# Create the agent with custom tools and skills middleware
-agent = create_deep_agent(
-    llm,
-    system_prompt="""    
-    Use the skills to answer user questions accurately. When you need information
-    that requires a tool, use it. Always provide clear and helpful responses.
+if "agent" not in st.session_state:
+    st.session_state.agent = create_deep_agent(
+        llm,
+        system_prompt="""    
+        Use the skills to answer user questions accurately. When you need information
+        that requires a tool, use it. Always provide clear and helpful responses.
+        
+        The read_file tool cannot access files outside the current working directory.
     
-    The read_file tool cannot access files outside the current working directory.
-
-    ## Filesystem Tools `ls`, `read_file`, `write_file`, `edit_file`, `glob`, `grep`
-
-    **IMPORTANT - Path Handling:**
-    - All file paths must be absolute paths (e.g., `/tmp/test/file.txt`)
-    - Use the working directory from <env> to construct absolute paths
-    - Example: To create a file in your working directory, use `/tmp/test/research_project/file.md`
-    - Never use relative paths - always construct full absolute paths
-    """
-)
+        ## Filesystem Tools `ls`, `read_file`, `write_file`, `edit_file`, `glob`, `grep`
+    
+        **IMPORTANT - Path Handling:**
+        - All file paths must be absolute paths (e.g., `/tmp/test/file.txt`)
+        - Use the working directory from <env> to construct absolute paths
+        - Example: To create a file in your working directory, use `/tmp/test/research_project/file.md`
+        - Never use relative paths - always construct full absolute paths
+        """
+    )
 
