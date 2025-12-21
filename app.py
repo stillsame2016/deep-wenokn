@@ -56,15 +56,34 @@ def get_llm():
         }
     )
 
-# Initialize agent without complex skills middleware
+# Initialize agent with working skills middleware
 def initialize_agent():
     if st.session_state.agent is None:
         llm = get_llm()
         
+        # Setup directories
+        assistant_id = "agent"
         current_directory = os.getcwd()
+        local_skills_dir = Path(current_directory) / "skills"
         
-        # Simple middleware without skills complexity
+        # Use local skills directory
+        if local_skills_dir.exists():
+            skills_dir = str(local_skills_dir)
+            project_skills_dir = None
+        else:
+            skills_dir = settings.ensure_user_skills_dir(assistant_id)
+            project_skills_dir = settings.get_project_skills_dir()
+        
+        # Initialize skills middleware
+        skills_middleware = SkillsMiddleware(
+            skills_dir=skills_dir,
+            assistant_id=assistant_id,
+            project_skills_dir=project_skills_dir,
+        )
+        
+        # Create middleware
         agent_middleware = [
+            skills_middleware,
             ShellToolMiddleware(
                 workspace_root=current_directory,
                 execution_policy=HostExecutionPolicy(),
@@ -72,43 +91,42 @@ def initialize_agent():
             ),
         ]
         
-        # Simple, direct system prompt
+        # Direct system prompt focused on using skills
         system_prompt = """
-        You are WEN-OKN, a helpful AI assistant for geographic data analysis.
+        You are WEN-OKN, a geographic data assistant with access to specialized skills.
         
-        ## YOUR CAPABILITIES:
-        You can help with geographic data using Python libraries. When users ask for geographic information:
+        ## YOUR SKILLS:
+        You have these skills available as tools:
+        - us_counties: Get USA counties as GeoDataframe
+        - us_states: Get USA states as GeoDataframe
+        - power_plants: Get power plants as GeoDataframe
+        - dams: Get dams as GeoDataframe
+        - watersheds: Get watersheds as GeoDataframe
+        - rivers: Get rivers as GeoDataframe
         
-        ## HOW TO HANDLE GEOGRAPHIC REQUESTS:
+        ## EXACT INSTRUCTIONS:
         
-        For requests like "Find Ross county in Ohio":
-        1. Use Python with geopandas to get the data
-        2. Use available Python libraries in the environment
-        3. Create a simple script to fetch and display the data
-        4. ALWAYS display the result as a map using st.map()
-        5. Provide explanation of what's shown
+        When user asks "Find Ross county in Ohio":
+        1. Use the us_counties skill directly
+        2. The skill returns a GeoDataframe with all counties
+        3. Filter the GeoDataframe for Ross County, Ohio
+        4. Display the result with st.map()
+        5. Explain what's shown
         
-        ## EXAMPLE APPROACH:
-        ```python
-        import geopandas as gpd
-        import streamlit as st
-        
-        # Get counties data (use available datasets)
-        # Filter for Ross County, Ohio
-        # Display with st.map()
-        ```
-        
-        ## IMPORTANT:
-        - Keep scripts simple and focused
+        ## CRITICAL:
+        - Use skills DIRECTLY as tools - don't read SKILL.md files
+        - Don't create complex Python scripts
+        - Skills return GeoDataframes automatically
         - Always show maps for geographic data
-        - Use shell tool to run Python scripts
-        - Write scripts to /tmp/ and execute them
-        - Don't try to access restricted directories
         
-        Be helpful and create visual geographic responses!
+        ## EXAMPLE:
+        User: "Find Ross county in Ohio"
+        Response: Use us_counties skill → filter for "Ross" in Ohio → st.map() → explain
+        
+        Be direct and use the skills!
         """
         
-        # Create the agent with simple middleware
+        # Create the agent
         st.session_state.agent = create_deep_agent(
             llm,
             system_prompt=system_prompt,
@@ -118,27 +136,42 @@ def initialize_agent():
         # Add checkpointer
         st.session_state.agent.checkpointer = InMemorySaver()
         
-        # Store skills info for reference
+        # Store skills info
         st.session_state.skills_loaded = True
-        st.session_state.skills_directory = "Using direct Python approach"
+        st.session_state.skills_directory = skills_dir
 
 # Initialize agent
 initialize_agent()
 
 # Skills information section
 if st.session_state.skills_loaded and "skills_directory" in st.session_state:
-    with st.expander("📋 System Information", expanded=False):
-        st.success(f"✅ {st.session_state.skills_directory}")
-        st.markdown("**Available Capabilities:**")
-        st.markdown("- 🗺️ Geographic data analysis with Python")
-        st.markdown("- 📊 Map visualization using Streamlit")
-        st.markdown("- 🔍 Data filtering and analysis")
-        st.markdown("- 📈 Interactive geographic displays")
-        st.markdown("**Libraries Available:**")
-        st.markdown("- geopandas, pandas, streamlit")
-        st.markdown("- shapely, matplotlib, plotly")
+    with st.expander("📋 Available Skills", expanded=False):
+        st.success(f"✅ Skills loaded from: {st.session_state.skills_directory}")
+        
+        st.markdown("**Geographic Skills:**")
+        skills_list = [
+            "🗺️ us_counties - USA counties",
+            "🗺️ us_states - USA states", 
+            "🏭 power_plants - Power plants",
+            "🌊 dams - Dams",
+            "💧 watersheds - Watersheds",
+            "🌊 rivers - Rivers",
+            "📊 census_tracts - Census tracts"
+        ]
+        
+        cols = st.columns(2)
+        for i, skill in enumerate(skills_list):
+            with cols[i % 2]:
+                st.markdown(f"• {skill}")
+        
+        st.markdown("**How to use:**")
+        st.markdown("Just ask for what you want, e.g.:")
+        st.markdown("- \"Find Ross county in Ohio\"")
+        st.markdown("- \"Show power plants in California\"")
+        st.markdown("- \"Display watersheds in Colorado\"")
+        
 elif not st.session_state.skills_loaded:
-    st.info("🔄 Initializing system...")
+    st.info("🔄 Loading skills...")
 
 # Display chat messages
 def display_messages():
@@ -409,3 +442,4 @@ user_input = st.chat_input("Ask me anything about data analysis, geographic info
 
 if user_input:
     handle_user_input(user_input)
+
