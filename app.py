@@ -45,7 +45,8 @@ st.markdown(current_directory)
 st.markdown(os.path.expanduser("~"))
 
 assistant_id = "agent"
-agent_dir = settings.ensure_agent_dir(assistant_id)
+# agent_dir = settings.ensure_agent_dir(assistant_id)
+agent_dir = current_directory
 skills_dir = settings.ensure_user_skills_dir(assistant_id)
 project_skills_dir = settings.get_project_skills_dir()
 
