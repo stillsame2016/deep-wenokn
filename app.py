@@ -293,64 +293,23 @@ def initialize_agent():
 
 ## IMPORTANT: How Your Skills Work
 
-Your skills are located in `/mount/src/deep-wenokn/skills/` directory. Each skill has:
-- A SKILL.md file that describes how to use it
-- Python scripts or code that implement the functionality
+Your skills use SPARQL queries to fetch data from KnowWhereGraph endpoints.
+The main endpoint is: https://frink.apps.renci.org/federation/sparql
 
-The skills use SPARQL queries to fetch data from KnowWhereGraph endpoints.
+## CRITICAL: ALWAYS USE INLINE PYTHON EXECUTION
 
-## HOW TO USE SKILLS:
+**DO NOT create temporary .py files** - they cause permission and path issues.
 
-**METHOD 1 - Read SKILL.md and Execute** (PREFERRED):
-1. Read the skill's SKILL.md file to understand how it works
-2. Execute the Python code described in the SKILL.md using shell commands
-3. The code typically queries SPARQL endpoints and returns GeoDataFrames
+**INSTEAD, use inline Python with the shell tool:**
 
-**METHOD 2 - Direct SPARQL Query**:
-Create Python scripts that:
-- Use sparql_dataframe to query KnowWhereGraph
-- Process results into GeoDataFrames
-- Save as GeoJSON to /tmp/*.geojson for automatic visualization
-
-## AVAILABLE SKILLS:
-- us_counties: Query US county boundaries from KnowWhereGraph
-- us_states: Query US state boundaries
-- power_plants: Query power plant locations
-- dams: Query dam locations
-- watersheds: Query watershed boundaries
-- rivers: Query river networks
-
-## CRITICAL WORKFLOW:
-
-When asked to find geographic data:
-
-1. **First, check the skill's SKILL.md file**:
-   ```
-   cat /mount/src/deep-wenokn/skills/us_counties/SKILL.md
-   ```
-
-2. **Create a Python script based on the SKILL.md**:
-   - Use the SPARQL query patterns from SKILL.md
-   - Import: sparql_dataframe, geopandas, shapely
-   - Query the endpoint (usually https://frink.apps.renci.org/federation/sparql)
-   - Convert to GeoDataFrame
-   - Save to /tmp/*.geojson
-
-3. **Execute your script**:
-   ```
-   python3 /tmp/your_script.py
-   ```
-
-4. **The UI will automatically display the GeoJSON as a map**
-
-## EXAMPLE FOR "Find Ross County in Ohio":
-
-```python
+```bash
+python3 -c "
 import sparql_dataframe
 import geopandas as gpd
 from shapely import wkt
+import sys
 
-# SPARQL query for Ross County
+# Your SPARQL query here
 query = '''
 PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -361,28 +320,104 @@ WHERE {
   ?county rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_2> ;
           rdfs:label ?countyName ;
           geo:hasGeometry/geo:asWKT ?countyGeometry .
-  FILTER(CONTAINS(LCASE(?countyName), "ross"))
-  FILTER(CONTAINS(LCASE(?countyName), "ohio"))
+  FILTER(CONTAINS(LCASE(?countyName), 'alpine'))
+  FILTER(CONTAINS(LCASE(?countyName), 'california'))
 }
 '''
 
-# Execute query
-endpoint = 'https://frink.apps.renci.org/federation/sparql'
-df = sparql_dataframe.get(endpoint, query)
-
-# Convert to GeoDataFrame
-df['geometry'] = df['countyGeometry'].apply(wkt.loads)
-gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
-
-# Save for visualization
-gdf.to_file('/tmp/ross_county.geojson', driver='GeoJSON')
-print(f"Found {len(gdf)} county. Saved to /tmp/ross_county.geojson")
+try:
+    endpoint = 'https://frink.apps.renci.org/federation/sparql'
+    df = sparql_dataframe.get(endpoint, query)
+    
+    if len(df) == 0:
+        print('No results found')
+        sys.exit(1)
+    
+    df['geometry'] = df['countyGeometry'].apply(wkt.loads)
+    gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
+    
+    # Save to /tmp for visualization
+    gdf.to_file('/tmp/alpine_county.geojson', driver='GeoJSON')
+    print(f'Success! Found {len(gdf)} county/counties. Saved to /tmp/alpine_county.geojson')
+    print(f'Bounds: {gdf.total_bounds}')
+except Exception as e:
+    print(f'Error: {e}')
+    sys.exit(1)
+"
 ```
 
-Remember: 
-- DON'T try to call skills as direct functions
-- DO read SKILL.md files and create Python scripts
-- ALWAYS save results to /tmp/*.geojson for automatic map display"""
+## AVAILABLE GEOGRAPHIC ENTITIES:
+
+**Counties (AdministrativeRegion_2):**
+```sparql
+?county rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_2> ;
+        rdfs:label ?countyName ;
+        geo:hasGeometry/geo:asWKT ?countyGeometry .
+```
+
+**States (AdministrativeRegion_1):**
+```sparql
+?state rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_1> ;
+       rdfs:label ?stateName ;
+       geo:hasGeometry/geo:asWKT ?stateGeometry .
+```
+
+**Power Plants (PowerPlant):**
+```sparql
+?plant rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/PowerPlant> ;
+       rdfs:label ?plantName ;
+       geo:hasGeometry/geo:asWKT ?plantGeometry .
+```
+
+**Dams:**
+```sparql
+?dam rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/Dam> ;
+     rdfs:label ?damName ;
+     geo:hasGeometry/geo:asWKT ?damGeometry .
+```
+
+**Watersheds (HUC12):**
+```sparql
+?watershed rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/HUC12> ;
+           rdfs:label ?watershedName ;
+           geo:hasGeometry/geo:asWKT ?watershedGeometry .
+```
+
+## WORKFLOW FOR ANY GEOGRAPHIC QUERY:
+
+1. **Identify what to query** (county, state, power plant, etc.)
+2. **Build SPARQL query** with appropriate filters
+3. **Execute using inline Python** (python3 -c "...")
+4. **Save to /tmp/*.geojson** for automatic visualization
+5. **Explain the results**
+
+## EXAMPLE QUERIES:
+
+**Find a specific county:**
+```
+FILTER(CONTAINS(LCASE(?countyName), 'alpine'))
+FILTER(CONTAINS(LCASE(?countyName), 'california'))
+```
+
+**Find all counties in a state:**
+```
+FILTER(CONTAINS(LCASE(?countyName), 'california'))
+```
+
+**Find power plants in a region:**
+```
+FILTER(CONTAINS(LCASE(?plantName), 'california'))
+```
+
+## CRITICAL RULES:
+1. ✅ USE: `python3 -c "...inline code..."`
+2. ❌ DON'T: Create .py files with write_file
+3. ✅ ALWAYS: Save results to /tmp/*.geojson
+4. ✅ USE: Multi-line strings with triple quotes for SPARQL
+5. ✅ HANDLE: Errors with try/except and sys.exit(1)
+6. ✅ PRINT: Success messages and bounds information
+
+The UI will automatically detect and display any .geojson files created in /tmp!"""
             
             # Create the agent WITHOUT checkpointer
             st.session_state.agent = create_deep_agent(
