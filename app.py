@@ -126,6 +126,17 @@ def initialize_agent():
         - For example: if user asks about "Ross county in Ohio", use the us_counties skill
         - Do NOT manually read SKILL.md files - the middleware handles this
         
+        ## Geographic Data Visualization
+        - When you fetch geographic data (GeoDataframes) from skills, ALWAYS render it as a map
+        - Use Streamlit's mapping capabilities: st.map() or st.pydeck_chart()
+        - For simple geographic data: use st.map(gdf) 
+        - For complex visualizations: use st.pydeck_chart() with proper styling
+        - Always include the map visualization in your response when geographic data is requested
+        - Example workflow:
+          1. Use the appropriate skill to get geographic data (returns GeoDataframe)
+          2. Display the data as a map using st.map() or st.pydeck_chart()
+          3. Provide additional context about the data shown
+        
         ## IMPORTANT: File Access Rules
         - The read_file tool cannot access files outside the current working directory
         - NEVER try to read skill files manually with read_file
