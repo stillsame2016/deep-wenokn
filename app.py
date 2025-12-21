@@ -22,3 +22,20 @@ st.set_page_config(layout="wide", page_title="WEN-OKN")
 
 # Set up the title
 st.markdown("### &nbsp; WEN-OKN: Dive into Data, Never Easier")
+
+llm = ChatOpenAI(
+        model="mimo-v2-flash",
+        base_url="https://api.xiaomimimo.com/v1",
+        api_key=st.secrets["XIAOMI_API_KEY"],
+        temperature=0.3,
+        top_p=0.95,
+        stream=False,
+        stop=None,
+        frequency_penalty=0,
+        presence_penalty=0,
+        extra_body={
+            "thinking": {"type": "disabled"}
+        }
+    )
+
+
