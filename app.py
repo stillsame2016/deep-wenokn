@@ -11,7 +11,8 @@ from langchain.agents.middleware import (
 )
 from langchain_core.messages import HumanMessage, ToolMessage, AIMessage
 from langgraph.types import Command
-from langgraph.checkpoint.memory import InMemorySaver
+# REMOVED: InMemorySaver - this was causing serialization issues
+# We'll manage conversation state manually in Streamlit session state
 
 from deepagents_cli.skills.middleware import SkillsMiddleware
 from deepagents_cli.config import settings
@@ -29,8 +30,8 @@ if "agent" not in st.session_state:
     st.session_state.agent = None
 if "skills_loaded" not in st.session_state:
     st.session_state.skills_loaded = False
-if "thread_id" not in st.session_state:
-    st.session_state.thread_id = "streamlit_chat_001"
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []
 
 # Configuration section
 with st.container():
@@ -48,7 +49,7 @@ def get_llm():
         api_key=st.secrets.get("XIAOMI_API_KEY", os.getenv("XIAOMI_API_KEY", "")),
         temperature=st.session_state.get("temp_slider", 0.3),
         top_p=0.95,
-        streaming=True,  # Enable streaming for better UX
+        streaming=True,
         stop=None,
         frequency_penalty=0,
         presence_penalty=0,
@@ -138,15 +139,15 @@ Your approach:
 
 Remember: Skills are tools - use them directly, don't overcomplicate!"""
             
-            # Create the agent
+            # Create the agent WITHOUT checkpointer to avoid serialization issues
             st.session_state.agent = create_deep_agent(
                 llm,
                 system_prompt=system_prompt,
                 middleware=agent_middleware,
             )
             
-            # Add checkpointer for conversation memory
-            st.session_state.agent.checkpointer = InMemorySaver()
+            # DO NOT add checkpointer - it causes msgpack serialization errors
+            # We'll manage conversation state manually via st.session_state
             
             # Store skills info
             st.session_state.skills_loaded = True
@@ -224,6 +225,9 @@ def format_tool_display(tool_name: str, args: dict) -> str:
         return f"Writing: {file_path}"
     elif tool_name == "shell":
         command = args.get("command", "unknown")
+        # Truncate long commands
+        if len(command) > 60:
+            command = command[:57] + "..."
         return f"Executing: {command}"
     elif tool_name == "ls":
         path = args.get("path", ".")
@@ -243,7 +247,7 @@ def display_messages():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-# Handle user input with improved streaming
+# Handle user input - FIXED VERSION without checkpointer
 async def handle_user_input_async(user_input):
     # Add user message to chat
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -258,88 +262,150 @@ async def handle_user_input_async(user_input):
         tool_calls_container = st.container()
         
         try:
-            # Create config with thread_id for checkpointer
+            # CRITICAL FIX: Don't use config with thread_id since we removed the checkpointer
+            # This was causing the msgpack serialization error
             config = {
-                "configurable": {"thread_id": st.session_state.thread_id},
                 "metadata": {"assistant_id": "agent"},
             }
             
+            # Include conversation history for context
+            # Build messages array with history
+            messages_with_history = []
+            
+            # Add last few exchanges for context (limit to last 10 messages to avoid context overflow)
+            recent_messages = st.session_state.messages[-10:] if len(st.session_state.messages) > 10 else st.session_state.messages
+            for msg in recent_messages:
+                messages_with_history.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+            
             # Prepare input
-            stream_input = {"messages": [{"role": "user", "content": user_input}]}
+            stream_input = {"messages": messages_with_history}
             
             accumulated_text = ""
             displayed_tool_ids = set()
+            tool_call_count = 0
             
             # Stream the response
-            async for event in st.session_state.agent.astream(
-                stream_input,
-                config=config,
-                stream_mode="messages",
-            ):
-                # Handle different event types
-                if isinstance(event, tuple) and len(event) >= 2:
-                    message, metadata = event[0], event[1] if len(event) > 1 else {}
-                    
-                    # Skip human messages
-                    if isinstance(message, HumanMessage):
-                        continue
-                    
-                    # Handle AI messages with content
-                    if isinstance(message, AIMessage):
-                        # Extract text content
-                        if hasattr(message, 'content') and isinstance(message.content, str):
-                            if message.content:
-                                accumulated_text += message.content
-                                response_placeholder.markdown(accumulated_text)
+            try:
+                async for event in st.session_state.agent.astream(
+                    stream_input,
+                    config=config,
+                    stream_mode="messages",
+                ):
+                    # Handle different event types
+                    if isinstance(event, tuple) and len(event) >= 2:
+                        message, metadata = event[0], event[1] if len(event) > 1 else {}
                         
-                        # Handle tool calls
-                        if hasattr(message, 'tool_calls') and message.tool_calls:
-                            for tool_call in message.tool_calls:
-                                tool_id = tool_call.get('id')
-                                if tool_id and tool_id not in displayed_tool_ids:
-                                    displayed_tool_ids.add(tool_id)
-                                    tool_name = tool_call.get('name', 'unknown')
-                                    tool_args = tool_call.get('args', {})
-                                    icon = TOOL_ICONS.get(tool_name, "🔧")
-                                    display_str = format_tool_display(tool_name, tool_args)
-                                    
-                                    with tool_calls_container:
-                                        st.info(f"{icon} {display_str}")
-                    
-                    # Handle tool messages
-                    elif isinstance(message, ToolMessage):
-                        tool_name = getattr(message, "name", "")
-                        tool_content = getattr(message, "content", "")
+                        # Skip human messages
+                        if isinstance(message, HumanMessage):
+                            continue
                         
-                        # Show errors prominently
-                        if isinstance(tool_content, str) and (
-                            tool_content.lower().startswith("error") or
-                            "failed" in tool_content.lower()
-                        ):
-                            with tool_calls_container:
-                                st.error(f"❌ {tool_name}: {tool_content}")
+                        # Handle AI messages with content
+                        if isinstance(message, AIMessage):
+                            # Extract text content
+                            if hasattr(message, 'content') and isinstance(message.content, str):
+                                if message.content:
+                                    accumulated_text += message.content
+                                    response_placeholder.markdown(accumulated_text)
+                            
+                            # Handle tool calls
+                            if hasattr(message, 'tool_calls') and message.tool_calls:
+                                for tool_call in message.tool_calls:
+                                    tool_id = tool_call.get('id')
+                                    if tool_id and tool_id not in displayed_tool_ids:
+                                        displayed_tool_ids.add(tool_id)
+                                        tool_call_count += 1
+                                        tool_name = tool_call.get('name', 'unknown')
+                                        tool_args = tool_call.get('args', {})
+                                        icon = TOOL_ICONS.get(tool_name, "🔧")
+                                        display_str = format_tool_display(tool_name, tool_args)
+                                        
+                                        with tool_calls_container:
+                                            st.info(f"{icon} {display_str}")
+                                        
+                                        # Add a small delay to prevent UI overwhelming
+                                        if tool_call_count % 5 == 0:
+                                            await asyncio.sleep(0.1)
+                        
+                        # Handle tool messages
+                        elif isinstance(message, ToolMessage):
+                            tool_name = getattr(message, "name", "")
+                            tool_content = getattr(message, "content", "")
+                            
+                            # Show errors prominently
+                            if isinstance(tool_content, str) and (
+                                tool_content.lower().startswith("error") or
+                                "failed" in tool_content.lower()
+                            ):
+                                with tool_calls_container:
+                                    st.error(f"❌ {tool_name}: {tool_content}")
+            
+            except Exception as stream_error:
+                # If streaming fails, try to get a response without streaming
+                st.warning("⚠️ Streaming failed, trying direct invocation...")
+                
+                result = await st.session_state.agent.ainvoke(
+                    stream_input,
+                    config=config,
+                )
+                
+                # Extract response from result
+                if isinstance(result, dict) and "messages" in result:
+                    last_message = result["messages"][-1]
+                    if hasattr(last_message, 'content') and isinstance(last_message.content, str):
+                        accumulated_text = last_message.content
+                        response_placeholder.markdown(accumulated_text)
+                else:
+                    raise stream_error
             
             # Save final response
             if accumulated_text:
                 st.session_state.messages.append({"role": "assistant", "content": accumulated_text})
             else:
                 # If no text was accumulated, show a default message
-                default_msg = "I've processed your request. The results should be displayed above."
+                default_msg = "✅ I've processed your request. Please check the tool outputs above for results."
                 response_placeholder.markdown(default_msg)
                 st.session_state.messages.append({"role": "assistant", "content": default_msg})
             
         except Exception as e:
             error_message = f"❌ An error occurred: {str(e)}"
             st.error(error_message)
-            st.exception(e)
+            # Show the full traceback for debugging
+            import traceback
+            with st.expander("🔍 Error Details"):
+                st.code(traceback.format_exc())
             st.session_state.messages.append({"role": "assistant", "content": error_message})
 
 # Synchronous wrapper for async function
 def handle_user_input(user_input):
-    asyncio.run(handle_user_input_async(user_input))
+    try:
+        asyncio.run(handle_user_input_async(user_input))
+    except RuntimeError as e:
+        # Handle "asyncio.run() cannot be called from a running event loop"
+        if "cannot be called from a running event loop" in str(e):
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Create a task instead
+                import nest_asyncio
+                nest_asyncio.apply()
+                asyncio.run(handle_user_input_async(user_input))
+            else:
+                raise
+        else:
+            raise
 
 # Main chat interface
 st.markdown("## 💬 Chat Interface")
+
+# Add a button to clear conversation history
+col1, col2 = st.columns([6, 1])
+with col2:
+    if st.button("🗑️ Clear Chat", use_container_width=True):
+        st.session_state.messages = []
+        st.session_state.conversation_history = []
+        st.rerun()
 
 # Display existing messages
 display_messages()
