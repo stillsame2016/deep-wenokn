@@ -453,30 +453,4 @@ user_input = st.chat_input("Ask me anything about data analysis, geographic info
 if user_input:
     handle_user_input(user_input)
 
-# Clear chat button
-if st.button("Clear Chat"):
-    st.session_state.messages = []
-    st.rerun()
 
-# Footer with helpful tips
-st.markdown("---")
-st.markdown("### 💡 Tips for using WEN-OKN:")
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown("**🗺️ Geographic Data**")
-    st.markdown("Ask about counties, states, watersheds, or environmental data by location")
-
-with col2:
-    st.markdown("**🏭 Infrastructure**")
-    st.markdown("Query power plants, dams, coal mines, and other facilities")
-
-with col3:
-    st.markdown("**📊 Statistics**")
-    st.markdown("Get demographic, economic, and environmental statistics")
-
-st.markdown("**Example queries:**")
-st.markdown("- \"Show me power plants in California\"")
-st.markdown("- \"What are the PFAS contamination sites in Maine?\"")
-st.markdown("- \"Get demographic data for New York County\"")
-st.markdown("- \"Find dams in the Colorado River watershed\"")
