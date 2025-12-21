@@ -22,6 +22,16 @@ st.set_page_config(layout="wide", page_title="WEN-OKN")
 # Set up the title
 st.markdown("### &nbsp; WEN-OKN: Dive into Data, Never Easier")
 
+
+current_dir = os.getcwd()
+
+for root, dirs, files in os.walk(current_dir):
+    for file in files:
+        # Join the root path and filename to get the full path
+        full_path = os.path.join(root, file)
+        st.markdown(full_path)
+
+
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
