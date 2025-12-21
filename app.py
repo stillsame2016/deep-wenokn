@@ -56,151 +56,89 @@ def get_llm():
         }
     )
 
-# Initialize agent with skills
+# Initialize agent without complex skills middleware
 def initialize_agent():
     if st.session_state.agent is None:
         llm = get_llm()
         
-        # Setup directories like the CLI does
-        assistant_id = "agent"
         current_directory = os.getcwd()
         
-        # For Streamlit Cloud, use local skills folder
-        local_skills_dir = Path(current_directory) / "skills"
-        
-        # Try to use local skills folder first, fallback to CLI settings
-        if local_skills_dir.exists():
-            skills_dir = str(local_skills_dir)
-            project_skills_dir = None
-            st.success(f"✅ Using local skills folder: {skills_dir}")
-        else:
-            # Fallback to CLI settings
-            skills_dir = settings.ensure_user_skills_dir(assistant_id)
-            project_skills_dir = settings.get_project_skills_dir()
-            st.info(f"📁 Using CLI skills directory: {skills_dir}")
-        
-        # Initialize skills middleware
-        skills_middleware = SkillsMiddleware(
-            skills_dir=skills_dir,
-            assistant_id=assistant_id,
-            project_skills_dir=project_skills_dir,
-        )
-        
-        # Create middleware like the CLI
+        # Simple middleware without skills complexity
         agent_middleware = [
-            skills_middleware,
             ShellToolMiddleware(
-                workspace_root="/mount/src/deep-wenokn",  # Expand workspace to include skills folder
+                workspace_root=current_directory,
                 execution_policy=HostExecutionPolicy(),
                 env=os.environ,
             ),
         ]
         
-        # Enhanced system prompt
+        # Simple, direct system prompt
         system_prompt = """
-        You are WEN-OKN, a helpful AI assistant with access to specialized skills for data analysis and research.
+        You are WEN-OKN, a helpful AI assistant for geographic data analysis.
         
-        ## YOUR AVAILABLE SKILLS (USE THESE DIRECTLY):
-        You have these skills available as tools - use them directly:
-        - us_counties: Get USA counties as GeoDataframe
-        - us_states: Get USA states as GeoDataframe  
-        - census_tracts: Get USA census tracts as GeoDataframe
-        - watersheds: Get watersheds as GeoDataframe
-        - power_plants: Get power plants as GeoDataframe
-        - dams: Get dams as GeoDataframe
-        - rivers: Get rivers as GeoDataframe
-        - And many more geographic and environmental skills
+        ## YOUR CAPABILITIES:
+        You can help with geographic data using Python libraries. When users ask for geographic information:
         
-        ## CRITICAL INSTRUCTIONS - HOW TO RESPOND:
+        ## HOW TO HANDLE GEOGRAPHIC REQUESTS:
         
-        ### For Geographic Requests (like "Find Ross county in Ohio"):
-        1. Use the appropriate skill directly (e.g., us_counties for counties)
-        2. The skill returns a GeoDataframe - filter it for your specific request
-        3. ALWAYS display the result as a map using st.map()
-        4. Provide brief explanation of what's shown
+        For requests like "Find Ross county in Ohio":
+        1. Use Python with geopandas to get the data
+        2. Use available Python libraries in the environment
+        3. Create a simple script to fetch and display the data
+        4. ALWAYS display the result as a map using st.map()
+        5. Provide explanation of what's shown
         
-        ### EXAMPLE WORKFLOW:
-        User: "Find Ross county in Ohio"
-        Your response:
-        1. Use us_counties skill to get all counties
-        2. Filter for Ross County, Ohio
-        3. Display with st.map(filtered_gdf)
-        4. Explain what the map shows
+        ## EXAMPLE APPROACH:
+        ```python
+        import geopandas as gpd
+        import streamlit as st
         
-        ## WHAT NOT TO DO:
-        - NEVER try to read SKILL.md files manually
-        - NEVER create complex Python scripts
-        - NEVER use read_file for skill files
-        - NEVER try to access external APIs directly
-        - The skills handle everything automatically
+        # Get counties data (use available datasets)
+        # Filter for Ross County, Ohio
+        # Display with st.map()
+        ```
         
-        ## FILE OPERATIONS:
-        - Only use read_file/write_file for files in the current working directory
-        - Never try to access files in the skills directory
+        ## IMPORTANT:
+        - Keep scripts simple and focused
+        - Always show maps for geographic data
+        - Use shell tool to run Python scripts
+        - Write scripts to /tmp/ and execute them
+        - Don't try to access restricted directories
         
-        ## MAP VISUALIZATION:
-        - Always use st.map(gdf) for geographic data
-        - Always include maps when geographic data is requested
-        - Maps make the data much more useful for users
-        
-        Be direct, use the skills, and show maps for geographic data!
+        Be helpful and create visual geographic responses!
         """
         
-        # Create the agent with custom tools and skills middleware
+        # Create the agent with simple middleware
         st.session_state.agent = create_deep_agent(
             llm,
             system_prompt=system_prompt,
             middleware=agent_middleware,
         )
         
-        # Add checkpointer like the CLI
+        # Add checkpointer
         st.session_state.agent.checkpointer = InMemorySaver()
         
         # Store skills info for reference
         st.session_state.skills_loaded = True
-        st.session_state.skills_directory = skills_dir
+        st.session_state.skills_directory = "Using direct Python approach"
 
 # Initialize agent
 initialize_agent()
 
 # Skills information section
 if st.session_state.skills_loaded and "skills_directory" in st.session_state:
-    with st.expander("📋 Available Skills", expanded=False):
-        skills_dir = st.session_state.skills_directory
-        st.success(f"✅ Skills loaded from: {skills_dir}")
-        
-        # Show available skills from directory
-        try:
-            skills_path = Path(skills_dir)
-            if skills_path.exists():
-                skill_folders = [f for f in skills_path.iterdir() if f.is_dir() and (f / "SKILL.md").exists()]
-                
-                if skill_folders:
-                    cols = st.columns(min(3, len(skill_folders)))
-                    for i, skill_folder in enumerate(skill_folders):
-                        with cols[i % 3]:
-                            skill_name = skill_folder.name
-                            skill_file = skill_folder / "SKILL.md"
-                            
-                            st.markdown(f"**{skill_name}**")
-                            
-                            # Read first few lines of skill description
-                            try:
-                                with open(skill_file, 'r', encoding='utf-8') as f:
-                                    lines = f.readlines()[:2]
-                                    for line in lines:
-                                        if line.strip() and not line.startswith('#'):
-                                            st.markdown(f"  {line.strip()}")
-                            except:
-                                st.markdown("  *Skill description unavailable*")
-                else:
-                    st.info("No skills found in the skills directory")
-            else:
-                st.warning("Skills directory not found")
-        except Exception as e:
-            st.error(f"Error reading skills: {str(e)}")
+    with st.expander("📋 System Information", expanded=False):
+        st.success(f"✅ {st.session_state.skills_directory}")
+        st.markdown("**Available Capabilities:**")
+        st.markdown("- 🗺️ Geographic data analysis with Python")
+        st.markdown("- 📊 Map visualization using Streamlit")
+        st.markdown("- 🔍 Data filtering and analysis")
+        st.markdown("- 📈 Interactive geographic displays")
+        st.markdown("**Libraries Available:**")
+        st.markdown("- geopandas, pandas, streamlit")
+        st.markdown("- shapely, matplotlib, plotly")
 elif not st.session_state.skills_loaded:
-    st.info("🔄 Loading skills...")
+    st.info("🔄 Initializing system...")
 
 # Display chat messages
 def display_messages():
@@ -471,8 +409,3 @@ user_input = st.chat_input("Ask me anything about data analysis, geographic info
 
 if user_input:
     handle_user_input(user_input)
-
-# Clear chat button
-if st.button("Clear Chat"):
-    st.session_state.messages = []
-    st.rerun()
