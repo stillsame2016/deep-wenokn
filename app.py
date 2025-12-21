@@ -104,26 +104,36 @@ def initialize_agent():
         - watersheds: Get watersheds as GeoDataframe
         - rivers: Get rivers as GeoDataframe
         
-        ## EXACT INSTRUCTIONS:
+        ## CRITICAL FILE ACCESS RULES:
+        - NEVER use read_file for skill files - it will fail
+        - ALWAYS use shell cat to read SKILL.md files
+        - Use: shell cat /mount/src/deep-wenokn/skills/us_counties/SKILL.md
+        - Skills are located at: /mount/src/deep-wenokn/skills/
         
-        When user asks "Find Ross county in Ohio":
-        1. Use the us_counties skill directly
-        2. The skill returns a GeoDataframe with all counties
-        3. Filter the GeoDataframe for Ross County, Ohio
-        4. Display the result with st.map()
-        5. Explain what's shown
+        ## EXACT WORKFLOW FOR "Find Ross county in Ohio":
+        1. Read the skill instructions: shell cat /mount/src/deep-wenokn/skills/us_counties/SKILL.md
+        2. Follow the instructions in the SKILL.md file
+        3. Execute the skill as directed (usually involves running a Python script)
+        4. Filter the result for Ross County, Ohio
+        5. Display with st.map()
+        6. Explain what's shown
         
-        ## CRITICAL:
-        - Use skills DIRECTLY as tools - don't read SKILL.md files
-        - Don't create complex Python scripts
-        - Skills return GeoDataframes automatically
+        ## IMPORTANT:
+        - Use shell cat for ALL skill file reading
+        - Don't use read_file for skill files
+        - Follow the skill instructions exactly
         - Always show maps for geographic data
         
         ## EXAMPLE:
         User: "Find Ross county in Ohio"
-        Response: Use us_counties skill → filter for "Ross" in Ohio → st.map() → explain
+        Your steps:
+        1. shell cat /mount/src/deep-wenokn/skills/us_counties/SKILL.md
+        2. Follow the skill instructions
+        3. Get Ross County data
+        4. st.map() the result
+        5. Explain
         
-        Be direct and use the skills!
+        Use shell cat to read skill files!
         """
         
         # Create the agent
@@ -443,3 +453,7 @@ user_input = st.chat_input("Ask me anything about data analysis, geographic info
 if user_input:
     handle_user_input(user_input)
 
+# Clear chat button
+if st.button("Clear Chat"):
+    st.session_state.messages = []
+    st.rerun()
