@@ -41,7 +41,7 @@ llm = ChatOpenAI(
 # Get the current working directory
 current_directory = os.getcwd()
 
-st.markdown("Current working directory:", current_directory)
+st.markdown(current_directory)
 
 if "agent" not in st.session_state:
     st.session_state.agent = create_deep_agent(
