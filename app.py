@@ -157,7 +157,7 @@ def initialize_agent():
             system_prompt=system_prompt,
             middleware=[
                 ShellToolMiddleware(
-                    execution_policy=HostExecutionPolicy.ALLOW_ALL
+                    execution_policy=HostExecutionPolicy.ALLOW
                 )
             ]
         )
