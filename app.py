@@ -105,6 +105,9 @@ def display_all_layers_map():
         return
     
     try:
+
+        map_config = keplergl(st.session_state.geodataframes, height=400)
+        
         import pydeck as pdk
         
         # Calculate overall bounds from all geodataframes
