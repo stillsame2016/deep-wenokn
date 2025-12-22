@@ -40,6 +40,8 @@ ORDER BY DESC(STRLEN(?riverGeometry))
 LIMIT 1
 ```
 
+Note a river name must be complete, for example, 'Muskingum River' or 'Rose Creek'. 
+
 ### Step 2: Send the SPARQL query to the FRINK endpoint
 
 Use the library sparql_dataframe, you can do
@@ -85,7 +87,6 @@ This code gets a dataframe from the SPARQL query
     gdf = gpd.GeoDataFrame(df, geometry='geometry', crs="EPSG:4326")
 
 ```
-
 
 ## Examples
 
