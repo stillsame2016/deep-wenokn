@@ -37,7 +37,13 @@ except ImportError:
 st.set_page_config(layout="wide", page_title="WEN-OKN")
 
 current_dir = os.getcwd()
+for root, dirs, files in os.walk(current_dir):
+    for file in files:
+        # Join the root path and filename to get the full path
+        full_path = os.path.join(root, file)
+        st.markdown(full_path)
 
+current_dir = "/tmp/wenokn_1cc71c7b_btgz02hw"
 for root, dirs, files in os.walk(current_dir):
     for file in files:
         # Join the root path and filename to get the full path
