@@ -472,6 +472,7 @@ The system will automatically:
 4. Use inline Python execution when possible: `python3 -c "..."`
 5. Avoid creating .py files unless necessary
 6. NEVER save to /tmp/ - always use the user-specific directory above
+7. Remove auxiliary data that aids in generating results, retaining only data directly related to the results.
 
 ## EXAMPLE WORKFLOW
 
