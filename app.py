@@ -618,6 +618,11 @@ async def handle_user_input_async(user_input):
                         elif isinstance(message, ToolMessage):
                             tool_name = getattr(message, "name", "")
                             tool_content = getattr(message, "content", "")
+
+                            # ADD THIS DEBUG OUTPUT
+                            with tool_calls_container:
+                                with st.expander(f"🔍 {tool_name} output", expanded=False):
+                                    st.code(tool_content[:1000])  # Show first 1000 chars
                             
                             if isinstance(tool_content, str) and (
                                 tool_content.lower().startswith("error") or
