@@ -105,8 +105,8 @@ def display_all_layers_map():
         return
     
     try:
-
-        map_config = keplergl(st.session_state.geodataframes, height=400)
+        options = {"keepExistingConfig": True}
+        map_config = keplergl(st.session_state.geodataframes, options=options, config=None, height=460)
         
         import pydeck as pdk
         
