@@ -89,19 +89,26 @@ with st.container():
 # Initialize LLM
 def get_llm():
     return ChatOpenAI(
-        model="mimo-v2-flash",
-        base_url="https://api.xiaomimimo.com/v1",
-        api_key=st.secrets.get("XIAOMI_API_KEY", os.getenv("XIAOMI_API_KEY", "")),
-        temperature=st.session_state.get("temp_slider", 0.3),
-        top_p=0.95,
-        streaming=True,
-        stop=None,
-        frequency_penalty=0,
-        presence_penalty=0,
-        extra_body={
-            "thinking": {"type": "disabled"}
-        }
-    )
+            model="glm-4.6",
+            base_url="https://ellm.nrp-nautilus.io/v1",
+            api_key=os.environ.get("NRP_API_KEY") ,
+            temperature=0,
+        )
+
+    # return ChatOpenAI(
+    #     model="mimo-v2-flash",
+    #     base_url="https://api.xiaomimimo.com/v1",
+    #     api_key=st.secrets.get("XIAOMI_API_KEY", os.getenv("XIAOMI_API_KEY", "")),
+    #     temperature=st.session_state.get("temp_slider", 0.3),
+    #     top_p=0.95,
+    #     streaming=True,
+    #     stop=None,
+    #     frequency_penalty=0,
+    #     presence_penalty=0,
+    #     extra_body={
+    #         "thinking": {"type": "disabled"}
+    #     }
+    # )
 
 # Helper function to display GeoDataFrame on map
 def display_geodataframe_map(gdf, title="Geographic Data"):
