@@ -1,5 +1,5 @@
 ---
-name: us_counties
+name: us-counties
 description: Use this skill for the requests related to the geometry definitions of USA counties; it provides a way to get the geometries of USA counties as a geodataframe.   
 ---
 
