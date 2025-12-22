@@ -294,7 +294,7 @@ def display_all_layers_map():
         st_folium(
             m,
             width=None,  # Use full width
-            height=700,
+            height=500,
             returned_objects=[],
             use_container_width=True
         )
