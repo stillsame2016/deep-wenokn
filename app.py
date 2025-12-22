@@ -589,6 +589,20 @@ async def handle_user_input_async(user_input):
                     "role": msg["role"],
                     "content": msg["content"]
                 })
+
+            # ==================== FIX STARTS HERE ====================
+            # Append a hidden system instruction to the last user message.
+            # This is sent to the LLM but NOT shown in the UI.
+            if messages_with_history and messages_with_history[-1]["role"] == "user":
+                messages_with_history[-1]["content"] += """
+                
+                SYSTEM INSTRUCTION:
+                1. IGNORE previous conversation style.
+                2. You MUST use the 'shell' tool to read the relevant SKILL.md file first.
+                3. You MUST generate Python code and save the output to the temp directory.
+                4. DO NOT answer from memory.
+                """
+            # ==================== FIX ENDS HERE ====================
             
             stream_input = {"messages": messages_with_history}
             
