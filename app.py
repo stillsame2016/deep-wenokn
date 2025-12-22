@@ -683,7 +683,7 @@ if st.session_state.current_view == "conversation":
 
 elif st.session_state.current_view == "map":
     # Map View
-    st.markdown("### 🗺️ Geographic Data Layers")
+    # st.markdown("### 🗺️ Geographic Data Layers")
     
     if not st.session_state.geodataframes:
         st.info("No map layers yet. Start a conversation to generate geographic data!")
