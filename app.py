@@ -621,7 +621,7 @@ def handle_user_input(user_input):
             raise
 
 # Main chat interface
-st.markdown("## 💬 Chat Interface")
+# st.markdown("## 💬 Chat Interface")
 
 # Control buttons
 col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
