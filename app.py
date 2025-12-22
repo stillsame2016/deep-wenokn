@@ -210,7 +210,7 @@ def display_all_layers_map():
                 return {
                     'fillColor': color,
                     'color': color,  # This is the line color
-                    'weight': 3,
+                    'weight': 1,
                     'fillOpacity': 0.4,
                 }
             
@@ -218,7 +218,7 @@ def display_all_layers_map():
                 return {
                     'fillColor': '#FFFF00',  # Yellow
                     'color': '#000000',  # Black border
-                    'weight': 4,
+                    'weight': 2,
                     'fillOpacity': 0.7,
                 }
             
