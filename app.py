@@ -220,7 +220,7 @@ def display_all_layers_map():
                         border: 2px solid black;
                         border-radius: 3px;
                         box-shadow: 3px;
-                        font-size: 12px;
+                        font-size: 11px;
                         max-width: 300px;
                     """,
                 )
