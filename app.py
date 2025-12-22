@@ -50,6 +50,8 @@ if "user_session_id" not in st.session_state:
 if "temp_dir" not in st.session_state:
     # Create user-specific temp directory
     st.session_state.temp_dir = tempfile.mkdtemp(prefix=f"wenokn_{st.session_state.user_session_id}_")
+if "current_view" not in st.session_state:
+    st.session_state.current_view = "conversation"  # "conversation" or "map"
 
 # Helper function to scan and cache skills documentation
 def scan_skills_documentation():
@@ -93,139 +95,114 @@ def get_llm():
         temperature=0,
     )
 
-# Helper function to display GeoDataFrame on map
-def display_geodataframe_map(gdf, title="Geographic Data"):
-    """Display a GeoDataFrame on an interactive map."""
-    if gdf is None or len(gdf) == 0:
-        st.warning("No geographic data to display")
+# Function to display all GeoDataFrames as layers on a single map
+def display_all_layers_map():
+    """Display all GeoDataFrames as layers on a single interactive map."""
+    if not st.session_state.geodataframes:
+        st.info("No geographic data available yet. Start a conversation to generate maps!")
         return
     
     try:
-        # Ensure we have a geometry column
-        if 'geometry' not in gdf.columns:
-            st.error("No geometry column found in the data")
-            return
+        import pydeck as pdk
         
-        # Convert to EPSG:4326 (WGS84) if not already
-        if gdf.crs and gdf.crs.to_epsg() != 4326:
-            gdf = gdf.to_crs(epsg=4326)
+        # Calculate overall bounds from all geodataframes
+        all_bounds = []
+        for gdf in st.session_state.geodataframes.values():
+            if gdf.crs and gdf.crs.to_epsg() != 4326:
+                gdf = gdf.to_crs(epsg=4326)
+            all_bounds.append(gdf.total_bounds)
         
-        # Get bounds for the map
-        bounds = gdf.total_bounds  # [minx, miny, maxx, maxy]
-        center_lat = (bounds[1] + bounds[3]) / 2
-        center_lon = (bounds[0] + bounds[2]) / 2
-        
-        # Calculate zoom level based on bounds
-        lat_diff = bounds[3] - bounds[1]
-        lon_diff = bounds[2] - bounds[0]
-        max_diff = max(lat_diff, lon_diff)
-        
-        if max_diff > 10:
-            zoom = 5
-        elif max_diff > 5:
-            zoom = 6
-        elif max_diff > 2:
-            zoom = 7
-        elif max_diff > 1:
-            zoom = 8
+        # Calculate center and zoom
+        if all_bounds:
+            min_x = min(b[0] for b in all_bounds)
+            min_y = min(b[1] for b in all_bounds)
+            max_x = max(b[2] for b in all_bounds)
+            max_y = max(b[3] for b in all_bounds)
+            
+            center_lat = (min_y + max_y) / 2
+            center_lon = (min_x + max_x) / 2
+            
+            lat_diff = max_y - min_y
+            lon_diff = max_x - min_x
+            max_diff = max(lat_diff, lon_diff)
+            
+            if max_diff > 10:
+                zoom = 5
+            elif max_diff > 5:
+                zoom = 6
+            elif max_diff > 2:
+                zoom = 7
+            elif max_diff > 1:
+                zoom = 8
+            else:
+                zoom = 9
         else:
-            zoom = 9
+            center_lat, center_lon, zoom = 39.8, -98.6, 4  # Center of US
         
-        # Create a container for the map
-        with st.container():
-            st.markdown(f"#### 🗺️ {title}")
+        # Create layers for each geodataframe
+        layers = []
+        colors = [
+            [0, 100, 200, 140],
+            [200, 0, 100, 140],
+            [100, 200, 0, 140],
+            [200, 100, 0, 140],
+            [100, 0, 200, 140],
+        ]
+        
+        for idx, (name, gdf) in enumerate(st.session_state.geodataframes.items()):
+            if gdf.crs and gdf.crs.to_epsg() != 4326:
+                gdf = gdf.to_crs(epsg=4326)
             
-            # Display summary stats
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Features", len(gdf))
-            with col2:
-                st.metric("Center Lat", f"{center_lat:.4f}")
-            with col3:
-                st.metric("Center Lon", f"{center_lon:.4f}")
+            geojson = json.loads(gdf.to_json())
+            color = colors[idx % len(colors)]
             
-            # Try to use pydeck for better visualization
-            try:
-                import pydeck as pdk
-                
-                # Convert to GeoJSON
-                geojson = json.loads(gdf.to_json())
-                
-                # Create pydeck layer
-                layer = pdk.Layer(
-                    "GeoJsonLayer",
-                    geojson,
-                    opacity=0.6,
-                    stroked=True,
-                    filled=True,
-                    extruded=False,
-                    wireframe=True,
-                    get_fill_color=[0, 100, 200, 140],
-                    get_line_color=[255, 255, 255],
-                    line_width_min_pixels=1,
-                    pickable=True,
-                )
-                
-                # Set the viewport
-                view_state = pdk.ViewState(
-                    latitude=center_lat,
-                    longitude=center_lon,
-                    zoom=zoom,
-                    pitch=0,
-                )
-                
-                # Render the map
-                r = pdk.Deck(
-                    layers=[layer],
-                    initial_view_state=view_state,
-                    tooltip={"text": "{properties}"},
-                    map_style="mapbox://styles/mapbox/light-v10",
-                )
-                
-                st.pydeck_chart(r)
-                
-            except ImportError:
-                # Fallback to simpler map visualization
-                # Extract centroids for point-based map
-                gdf_centroids = gdf.copy()
-                gdf_centroids['geometry'] = gdf_centroids.geometry.centroid
-                
-                # Create dataframe with lat/lon
-                map_df = pd.DataFrame({
-                    'lat': gdf_centroids.geometry.y,
-                    'lon': gdf_centroids.geometry.x,
-                })
-                
-                # Use Streamlit's built-in map
-                st.map(map_df, zoom=zoom)
-            
-            # Display attribute table
-            with st.expander("📊 View Attribute Table"):
-                # Drop geometry for display
-                display_df = gdf.drop(columns=['geometry'])
-                st.dataframe(display_df, use_container_width=True)
-            
-            # Download options
-            col1, col2 = st.columns(2)
-            with col1:
-                # GeoJSON download
-                geojson_str = gdf.to_json()
-                st.download_button(
-                    label="📥 Download as GeoJSON",
-                    data=geojson_str,
-                    file_name=f"{title.replace(' ', '_').lower()}.geojson",
-                    mime="application/json",
-                )
-            with col2:
-                # CSV download (without geometry)
-                csv_df = gdf.drop(columns=['geometry'])
-                csv_str = csv_df.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download as CSV",
-                    data=csv_str,
-                    file_name=f"{title.replace(' ', '_').lower()}.csv",
-                    mime="text/csv",
-                )
+            layer = pdk.Layer(
+                "GeoJsonLayer",
+                geojson,
+                opacity=0.6,
+                stroked=True,
+                filled=True,
+                extruded=False,
+                wireframe=True,
+                get_fill_color=color,
+                get_line_color=[255, 255, 255],
+                line_width_min_pixels=2,
+                pickable=True,
+            )
+            layers.append(layer)
+        
+        # Set the viewport
+        view_state = pdk.ViewState(
+            latitude=center_lat,
+            longitude=center_lon,
+            zoom=zoom,
+            pitch=0,
+        )
+        
+        # Render the map
+        r = pdk.Deck(
+            layers=layers,
+            initial_view_state=view_state,
+            tooltip={"text": "{properties}"},
+            map_style="mapbox://styles/mapbox/streets-v12",
+        )
+        
+        st.pydeck_chart(r, use_container_width=True, height=700)
+        
+    except ImportError:
+        # Fallback if pydeck not available
+        st.warning("⚠️ PyDeck not available. Install with: `pip install pydeck`")
+        
+        # Simple fallback using streamlit map
+        all_points = []
+        for gdf in st.session_state.geodataframes.values():
+            if gdf.crs and gdf.crs.to_epsg() != 4326:
+                gdf = gdf.to_crs(epsg=4326)
+            centroids = gdf.geometry.centroid
+            all_points.extend([{"lat": p.y, "lon": p.x} for p in centroids])
+        
+        if all_points:
+            st.map(pd.DataFrame(all_points))
     
     except Exception as e:
         st.error(f"Error displaying map: {str(e)}")
@@ -251,9 +228,7 @@ def load_and_cleanup_temp_files():
                     # Store in session state with descriptive name
                     name = gf.stem
                     st.session_state.geodataframes[name] = gdf
-                    
-                    # Display the map
-                    display_geodataframe_map(gdf, title=f"📍 {name.replace('_', ' ').title()}")
+                    st.success(f"✅ Loaded {name} into map layers")
                 
                 # Delete the file after loading
                 gf.unlink()
@@ -269,19 +244,7 @@ def load_and_cleanup_temp_files():
                     # Store in session state
                     name = cf.stem
                     st.session_state.dataframes[name] = df
-                    
-                    # Display the dataframe
-                    with st.expander(f"📊 {name.replace('_', ' ').title()}"):
-                        st.dataframe(df, use_container_width=True)
-                        
-                        # Download button
-                        csv_str = df.to_csv(index=False)
-                        st.download_button(
-                            label="📥 Download CSV",
-                            data=csv_str,
-                            file_name=f"{name}.csv",
-                            mime="text/csv",
-                        )
+                    st.success(f"✅ Loaded {name} data")
                 
                 # Delete the file after loading
                 cf.unlink()
@@ -329,11 +292,9 @@ def initialize_agent():
             if local_skills_dir.exists():
                 skills_dir = str(local_skills_dir)
                 project_skills_dir = None
-                st.info(f"✅ Loading skills from: {skills_dir}")
             else:
                 skills_dir = settings.ensure_user_skills_dir(assistant_id)
                 project_skills_dir = settings.get_project_skills_dir()
-                st.info(f"ℹ️ Loading skills from: {skills_dir}")
             
             # Initialize skills middleware
             skills_middleware = SkillsMiddleware(
@@ -397,8 +358,8 @@ df.to_csv('{st.session_state.temp_dir}/result.csv', index=False)
 ```
 
 The system will automatically:
-1. Load these files into the user's session
-2. Display maps/tables
+1. Load these files into the user's session as map layers
+2. Display on interactive map
 3. Delete the temporary files (for security)
 
 ## GENERAL BEST PRACTICES
@@ -419,7 +380,7 @@ Your approach:
 2. Read and understand the instructions
 3. Follow the approach described in SKILL.md
 4. Save output to {st.session_state.temp_dir}/muskingum_river.geojson
-5. The system will automatically load and display it
+5. The system will automatically load it as a map layer
 6. Explain what you found
 
 Remember: Each skill is unique. Always read its SKILL.md file first and follow those specific instructions. Always save to the user-specific directory for privacy and security."""
@@ -435,39 +396,12 @@ Remember: Each skill is unique. Always read its SKILL.md file first and follow t
             st.session_state.skills_loaded = True
             st.session_state.skills_directory = skills_dir
             
-            st.success("✅ Agent initialized successfully!")
-            
         except Exception as e:
             st.error(f"❌ Failed to initialize agent: {str(e)}")
             st.exception(e)
 
 # Initialize agent on first run
 initialize_agent()
-
-# Skills information section
-if st.session_state.skills_loaded and "skills_directory" in st.session_state:
-    with st.expander("📋 Available Skills", expanded=False):
-        st.success(f"✅ Skills loaded from: {st.session_state.skills_directory}")
-        
-        skills_docs = scan_skills_documentation()
-        
-        if skills_docs:
-            st.markdown("**Available Skills:**")
-            for skill_name in sorted(skills_docs.keys()):
-                st.markdown(f"• 🗺️ **{skill_name}** - `skills/{skill_name}/SKILL.md`")
-        
-        st.markdown("**How to use:**")
-        st.markdown("Just ask for what you want, e.g.:")
-        st.markdown("- \"Find Ross county in Ohio\"")
-        st.markdown("- \"Show the Ohio River\"")
-        st.markdown("- \"Display power plants in California\"")
-        st.markdown("- \"Find watersheds in Colorado\"")
-        
-        if not GEOPANDAS_AVAILABLE:
-            st.warning("⚠️ GeoPandas not available. Install with: `pip install geopandas`")
-        
-elif not st.session_state.skills_loaded:
-    st.info("🔄 Loading skills...")
 
 # Tool icons for display
 TOOL_ICONS = {
@@ -483,33 +417,18 @@ TOOL_ICONS = {
     "http_request": "🌐",
     "task": "🤖",
     "write_todos": "📋",
-    "us_counties": "🗺️",
-    "us_states": "🗺️",
-    "power_plants": "🏭",
-    "dams": "🌊",
-    "watersheds": "💧",
-    "rivers": "🌊",
-    "census_tracts": "📊",
 }
 
 def format_tool_display(tool_name: str, args: dict) -> str:
     """Format tool call for display."""
-    if tool_name == "read_file":
-        file_path = args.get("file_path", "unknown")
-        return f"Reading: {file_path}"
-    elif tool_name == "write_file":
-        file_path = args.get("file_path", "unknown")
-        return f"Writing: {file_path}"
-    elif tool_name == "shell":
+    if tool_name == "shell":
         command = args.get("command", "unknown")
         if len(command) > 60:
             command = command[:57] + "..."
         return f"Executing: {command}"
-    elif tool_name == "ls":
-        path = args.get("path", ".")
-        return f"Listing: {path}"
-    elif tool_name in ["us_counties", "us_states", "power_plants", "dams", "watersheds", "rivers", "census_tracts"]:
-        return f"Fetching {tool_name.replace('_', ' ').title()} data"
+    elif tool_name == "read_file":
+        file_path = args.get("file_path", "unknown")
+        return f"Reading: {file_path}"
     else:
         args_str = str(args)
         if len(args_str) > 100:
@@ -522,7 +441,7 @@ def display_messages():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-# Handle user input - with automatic map display
+# Handle user input
 async def handle_user_input_async(user_input):
     # Add user message to chat
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -537,9 +456,7 @@ async def handle_user_input_async(user_input):
         tool_calls_container = st.container()
         
         try:
-            config = {
-                "metadata": {"assistant_id": "agent"},
-            }
+            config = {"metadata": {"assistant_id": "agent"}}
             
             # Build messages with history
             messages_with_history = []
@@ -606,10 +523,7 @@ async def handle_user_input_async(user_input):
             except Exception as stream_error:
                 st.warning("⚠️ Streaming failed, trying direct invocation...")
                 
-                result = await st.session_state.agent.ainvoke(
-                    stream_input,
-                    config=config,
-                )
+                result = await st.session_state.agent.ainvoke(stream_input, config=config)
                 
                 if isinstance(result, dict) and "messages" in result:
                     last_message = result["messages"][-1]
@@ -623,11 +537,11 @@ async def handle_user_input_async(user_input):
             if accumulated_text:
                 st.session_state.messages.append({"role": "assistant", "content": accumulated_text})
             else:
-                default_msg = "✅ I've processed your request. Please check the outputs above for results."
+                default_msg = "✅ I've processed your request."
                 response_placeholder.markdown(default_msg)
                 st.session_state.messages.append({"role": "assistant", "content": default_msg})
             
-            # IMPORTANT: Load files from temp directory and clean up
+            # Load files from temp directory and clean up
             load_and_cleanup_temp_files()
             
         except Exception as e:
@@ -644,58 +558,106 @@ def handle_user_input(user_input):
         asyncio.run(handle_user_input_async(user_input))
     except RuntimeError as e:
         if "cannot be called from a running event loop" in str(e):
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import nest_asyncio
-                nest_asyncio.apply()
-                asyncio.run(handle_user_input_async(user_input))
-            else:
-                raise
+            import nest_asyncio
+            nest_asyncio.apply()
+            asyncio.run(handle_user_input_async(user_input))
         else:
             raise
 
-# Sidebar for data management
+# ========== SIDEBAR ==========
 with st.sidebar:
-    st.markdown("### 📊 Session Data")
+    st.markdown("## 🌍 WEN-OKN")
+    st.markdown("---")
     
-    # Show stored GeoDataFrames
-    if st.session_state.geodataframes:
-        st.markdown(f"**🗺️ GeoDataFrames ({len(st.session_state.geodataframes)})**")
-        for name in st.session_state.geodataframes.keys():
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.text(f"• {name}")
-            with col2:
-                if st.button("View", key=f"view_gdf_{name}"):
-                    gdf = st.session_state.geodataframes[name]
-                    display_geodataframe_map(gdf, name.replace('_', ' ').title())
+    # Navigation buttons
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("💬 Conversation", use_container_width=True, type="primary" if st.session_state.current_view == "conversation" else "secondary"):
+            st.session_state.current_view = "conversation"
+            st.rerun()
+    with col2:
+        if st.button("🗺️ Map", use_container_width=True, type="primary" if st.session_state.current_view == "map" else "secondary"):
+            st.session_state.current_view = "map"
+            st.rerun()
     
-    # Show stored DataFrames
-    if st.session_state.dataframes:
-        st.markdown(f"**📋 DataFrames ({len(st.session_state.dataframes)})**")
-        for name in st.session_state.dataframes.keys():
-            st.text(f"• {name}")
+    st.markdown("---")
     
-    # Show generated code
-    if st.session_state.generated_code:
-        with st.expander(f"💻 Generated Code ({len(st.session_state.generated_code)})"):
-            for item in st.session_state.generated_code:
-                st.markdown(f"**{item['name']}**")
-                st.code(item['code'], language='python')
+    # Show layer count
+    num_layers = len(st.session_state.geodataframes)
+    st.markdown(f"**Map Layers:** {num_layers}")
     
-    # Clear session button
-    if st.button("🗑️ Clear All Session Data"):
+    if st.button("🗑️ Clear All Data", use_container_width=True):
         st.session_state.geodataframes = {}
         st.session_state.dataframes = {}
         st.session_state.generated_code = []
         st.session_state.messages = []
         st.rerun()
 
-# Display existing messages
-display_messages()
+# ========== MAIN CONTENT AREA ==========
 
-# Chat input
-user_input = st.chat_input("Ask about geographic data: counties, states, rivers, power plants, watersheds...")
+if st.session_state.current_view == "conversation":
+    # Conversation View
+    st.markdown("### 💬 Chat with WEN-OKN")
+    
+    # Display existing messages
+    display_messages()
+    
+    # Chat input
+    user_input = st.chat_input("Ask about geographic data: counties, states, rivers, power plants, watersheds...")
+    
+    if user_input:
+        handle_user_input(user_input)
 
-if user_input:
-    handle_user_input(user_input)
+elif st.session_state.current_view == "map":
+    # Map View
+    st.markdown("### 🗺️ Geographic Data Layers")
+    
+    if not st.session_state.geodataframes:
+        st.info("No map layers yet. Start a conversation to generate geographic data!")
+    else:
+        # Display the combined map
+        display_all_layers_map()
+        
+        st.markdown("---")
+        st.markdown("### 📊 Layer Management")
+        
+        # Layer controls
+        for name, gdf in st.session_state.geodataframes.items():
+            with st.expander(f"🗺️ {name.replace('_', ' ').title()} ({len(gdf)} features)"):
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    # Download GeoJSON
+                    geojson_str = gdf.to_json()
+                    st.download_button(
+                        label="📥 GeoJSON",
+                        data=geojson_str,
+                        file_name=f"{name}.geojson",
+                        mime="application/json",
+                        key=f"download_geojson_{name}",
+                        use_container_width=True
+                    )
+                
+                with col2:
+                    # Download CSV
+                    csv_df = gdf.drop(columns=['geometry'])
+                    csv_str = csv_df.to_csv(index=False)
+                    st.download_button(
+                        label="📥 CSV",
+                        data=csv_str,
+                        file_name=f"{name}.csv",
+                        mime="text/csv",
+                        key=f"download_csv_{name}",
+                        use_container_width=True
+                    )
+                
+                with col3:
+                    # Delete layer
+                    if st.button("🗑️ Delete", key=f"delete_{name}", use_container_width=True):
+                        del st.session_state.geodataframes[name]
+                        st.rerun()
+                
+                # Show attribute table
+                st.markdown("**Attributes:**")
+                display_df = gdf.drop(columns=['geometry'])
+                st.dataframe(display_df, use_container_width=True, height=200)
