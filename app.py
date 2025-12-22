@@ -435,7 +435,7 @@ def initialize_agent():
             # Updated system prompt with user-specific temp directory
             system_prompt = f"""You are WEN-OKN, a data expert specializing in answering questions using provided skills. 
 
-You must use the provided skills to answer questions.
+You must use the provided skills to answer questions by generaing inline Python code.
 
 ## YOUR SKILLS LOCATION
 
