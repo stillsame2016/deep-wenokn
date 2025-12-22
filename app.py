@@ -250,7 +250,7 @@ def display_all_layers_map():
             
             # Define the marker style for points
             point_marker = folium.CircleMarker(
-                radius=5,           # Size in pixels
+                radius=2,           # Size in pixels
                 weight=1,           # Border thickness
                 fill=True,
                 fill_opacity=0.7
