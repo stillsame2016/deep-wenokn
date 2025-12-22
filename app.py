@@ -191,7 +191,7 @@ def display_all_layers_map():
         ).add_to(m)
         
         # A professional, muted palette for mapping
-        COLORS = [
+        colors = [
             '#4A6D8C',  # Slate Blue (Water/Rivers)
             '#556B2F',  # Dark Olive Green (Parks/Nature)
             '#7E6B8F',  # Muted Purple (Boundaries)
