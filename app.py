@@ -190,9 +190,18 @@ def display_all_layers_map():
             control=True
         ).add_to(m)
         
-        # Define colors for different layers
-        colors = ['#FF0000', '#00FF00', '#0000FF', '#FF00FF', '#FFA500', '#8B0000', '#FFB6C1', 
-                  '#F5F5DC', '#00008B', '#006400', '#5F9EA0', '#9400D3', '#FFC0CB']
+        # A professional, muted palette for mapping
+        COLORS = [
+            '#4A6D8C',  # Slate Blue (Water/Rivers)
+            '#556B2F',  # Dark Olive Green (Parks/Nature)
+            '#7E6B8F',  # Muted Purple (Boundaries)
+            '#A68069',  # Soft Brown (Urban/Land)
+            '#5F9EA0',  # Cadet Blue (Infrastructure)
+            '#C27E7E',  # Dusty Rose (Highlights)
+            '#483D8B',  # Dark Slate Blue
+            '#8FBC8F',  # Dark Sea Green
+            '#BC8F8F'   # Rosy Brown
+        ]
         
         # Add each geodataframe as a layer
         for idx, (name, gdf) in enumerate(st.session_state.geodataframes.items()):
