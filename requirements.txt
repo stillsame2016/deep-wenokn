@@ -1,4 +1,3 @@
-deepagents
 deepagents-cli
 geopandas
 pandas
