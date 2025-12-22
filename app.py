@@ -137,7 +137,7 @@ def display_all_layers_map():
         # Create the base map with multiple tile options
         m = folium.Map(
             location=[center_lat, center_lon],
-            zoom_start=7,
+            zoom_start=6,
             tiles=None,  # We'll add tiles manually
             control_scale=True
         )
