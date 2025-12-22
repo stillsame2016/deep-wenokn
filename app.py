@@ -645,7 +645,7 @@ with st.sidebar:
     # Navigation buttons
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("💬 Conversation", use_container_width=True, type="primary" if st.session_state.current_view == "conversation" else "secondary"):
+        if st.button("💬 Chat", use_container_width=True, type="primary" if st.session_state.current_view == "conversation" else "secondary"):
             st.session_state.current_view = "conversation"
             st.rerun()
     with col2:
