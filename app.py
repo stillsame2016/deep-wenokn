@@ -269,13 +269,13 @@ def display_all_layers_map():
         ).add_to(m)
         
         # Add measure control
-        plugins.MeasureControl(
-            position='topleft',
-            primary_length_unit='kilometers',
-            secondary_length_unit='miles',
-            primary_area_unit='sqkilometers',
-            secondary_area_unit='acres'
-        ).add_to(m)
+        # plugins.MeasureControl(
+        #     position='topleft',
+        #     primary_length_unit='kilometers',
+        #     secondary_length_unit='miles',
+        #     primary_area_unit='sqkilometers',
+        #     secondary_area_unit='acres'
+        # ).add_to(m)
         
         # Add mouse position
         plugins.MousePosition().add_to(m)
