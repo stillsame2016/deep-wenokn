@@ -137,7 +137,7 @@ def display_all_layers_map():
         # Create the base map with multiple tile options
         m = folium.Map(
             location=[center_lat, center_lon],
-            zoom_start=6,
+            zoom_start=8,
             tiles=None,  # We'll add tiles manually
             control_scale=True
         )
@@ -174,8 +174,8 @@ def display_all_layers_map():
         ).add_to(m)
         
         # Define colors for different layers
-        colors = ['blue', 'red', 'green', 'purple', 'orange', 'darkred', 'lightred', 
-                  'beige', 'darkblue', 'darkgreen', 'cadetblue', 'darkpurple', 'pink']
+        colors = ['#FF0000', '#00FF00', '#0000FF', '#FF00FF', '#FFA500', '#8B0000', '#FFB6C1', 
+                  '#F5F5DC', '#00008B', '#006400', '#5F9EA0', '#9400D3', '#FFC0CB']
         
         # Add each geodataframe as a layer
         for idx, (name, gdf) in enumerate(st.session_state.geodataframes.items()):
@@ -188,36 +188,44 @@ def display_all_layers_map():
             # Create a feature group for this layer (allows toggling)
             feature_group = folium.FeatureGroup(name=name.replace('_', ' ').title(), show=True)
             
-            # Add GeoJSON to the feature group
-            style_function = lambda x, c=color: {
-                'fillColor': c,
-                'color': 'black',
-                'weight': 2,
-                'fillOpacity': 0.4,
-            }
+            # Add GeoJSON to the feature group with proper color handling
+            def style_function(feature, color=color):
+                return {
+                    'fillColor': color,
+                    'color': color,  # This is the line color
+                    'weight': 3,
+                    'fillOpacity': 0.4,
+                }
             
-            highlight_function = lambda x: {
-                'fillColor': 'yellow',
-                'color': 'black',
-                'weight': 3,
-                'fillOpacity': 0.7,
-            }
+            def highlight_function(feature):
+                return {
+                    'fillColor': '#FFFF00',  # Yellow
+                    'color': '#000000',  # Black border
+                    'weight': 4,
+                    'fillOpacity': 0.7,
+                }
             
-            # Create tooltip with all attributes
-            tooltip_fields = [col for col in gdf.columns if col != 'geometry']
-            tooltip = folium.GeoJsonTooltip(
-                fields=tooltip_fields if tooltip_fields else [],
-                aliases=[f"{field}:" for field in tooltip_fields] if tooltip_fields else [],
-                localize=True,
-                sticky=False,
-                labels=True,
-                style="""
-                    background-color: white;
-                    border: 2px solid black;
-                    border-radius: 3px;
-                    box-shadow: 3px;
-                """,
-            )
+            # Create tooltip with attributes (excluding geometry)
+            tooltip_fields = [col for col in gdf.columns if col not in ['geometry', 'Geometry', 'GEOMETRY']]
+            
+            if tooltip_fields:
+                tooltip = folium.GeoJsonTooltip(
+                    fields=tooltip_fields,
+                    aliases=[f"{field}:" for field in tooltip_fields],
+                    localize=True,
+                    sticky=False,
+                    labels=True,
+                    style="""
+                        background-color: white;
+                        border: 2px solid black;
+                        border-radius: 3px;
+                        box-shadow: 3px;
+                        font-size: 12px;
+                        max-width: 300px;
+                    """,
+                )
+            else:
+                tooltip = None
             
             folium.GeoJson(
                 gdf,
@@ -229,8 +237,28 @@ def display_all_layers_map():
             
             feature_group.add_to(m)
         
-        # Add layer control
-        folium.LayerControl(position='topright', collapsed=False).add_to(m)
+        # Add layer control with custom CSS for smaller font
+        layer_control = folium.LayerControl(position='topright', collapsed=False)
+        layer_control.add_to(m)
+        
+        # Add custom CSS to make layer control font smaller
+        custom_css = """
+        <style>
+        .leaflet-control-layers {
+            font-size: 11px !important;
+        }
+        .leaflet-control-layers-base label,
+        .leaflet-control-layers-overlays label {
+            font-size: 11px !important;
+            padding: 2px 5px !important;
+        }
+        .leaflet-control-layers-base,
+        .leaflet-control-layers-overlays {
+            line-height: 1.3 !important;
+        }
+        </style>
+        """
+        m.get_root().html.add_child(folium.Element(custom_css))
         
         # Add fullscreen button
         plugins.Fullscreen(
@@ -266,7 +294,7 @@ def display_all_layers_map():
         st_folium(
             m,
             width=None,  # Use full width
-            height=500,
+            height=700,
             returned_objects=[],
             use_container_width=True
         )
@@ -275,7 +303,8 @@ def display_all_layers_map():
         with st.expander("🎨 Map Legend", expanded=False):
             for idx, name in enumerate(st.session_state.geodataframes.keys()):
                 color = colors[idx % len(colors)]
-                st.markdown(f"🟦 **{name.replace('_', ' ').title()}** - {color}")
+                # Create a small colored box for the legend
+                st.markdown(f'<span style="color:{color};">⬤</span> **{name.replace("_", " ").title()}**', unsafe_allow_html=True)
     
     except Exception as e:
         st.error(f"Error displaying map: {str(e)}")
@@ -640,12 +669,37 @@ def handle_user_input(user_input):
 # ========== SIDEBAR ==========
 with st.sidebar:
     st.markdown("## 🌍 WEN-OKN")
+    
+    # Add custom CSS for button styling
+    st.markdown("""
+        <style>
+        /* Style for primary buttons */
+        div.stButton > button[kind="primary"] {
+            background-color: #1e3a8a !important;
+            color: white !important;
+            border: none !important;
+        }
+        div.stButton > button[kind="primary"]:hover {
+            background-color: #1e40af !important;
+        }
+        /* Style for secondary buttons */
+        div.stButton > button[kind="secondary"] {
+            background-color: #e5e7eb !important;
+            color: #374151 !important;
+            border: 1px solid #d1d5db !important;
+        }
+        div.stButton > button[kind="secondary"]:hover {
+            background-color: #d1d5db !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     st.markdown("---")
     
     # Navigation buttons
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("💬 Chat", use_container_width=True, type="primary" if st.session_state.current_view == "conversation" else "secondary"):
+        if st.button("💬 Conversation", use_container_width=True, type="primary" if st.session_state.current_view == "conversation" else "secondary"):
             st.session_state.current_view = "conversation"
             st.rerun()
     with col2:
@@ -683,7 +737,7 @@ if st.session_state.current_view == "conversation":
 
 elif st.session_state.current_view == "map":
     # Map View
-    # st.markdown("### 🗺️ Geographic Data Layers")
+    st.markdown("### 🗺️ Geographic Data Layers")
     
     if not st.session_state.geodataframes:
         st.info("No map layers yet. Start a conversation to generate geographic data!")
@@ -712,8 +766,8 @@ elif st.session_state.current_view == "map":
                     )
                 
                 with col2:
-                    # Download CSV
-                    csv_df = gdf.drop(columns=['geometry'])
+                    # Download CSV (exclude geometry columns)
+                    csv_df = gdf.drop(columns=[col for col in gdf.columns if col.lower() in ['geometry', 'geom', 'the_geom', 'shape']], errors='ignore')
                     csv_str = csv_df.to_csv(index=False)
                     st.download_button(
                         label="📥 CSV",
@@ -730,7 +784,7 @@ elif st.session_state.current_view == "map":
                         del st.session_state.geodataframes[name]
                         st.rerun()
                 
-                # Show attribute table
+                # Show attribute table (exclude geometry columns)
                 st.markdown("**Attributes:**")
-                display_df = gdf.drop(columns=['geometry'])
+                display_df = gdf.drop(columns=[col for col in gdf.columns if col.lower() in ['geometry', 'geom', 'the_geom', 'shape']], errors='ignore')
                 st.dataframe(display_df, use_container_width=True, height=200)
