@@ -17,6 +17,8 @@ import tempfile
 from deepagents_cli.skills.middleware import SkillsMiddleware
 from deepagents_cli.config import settings
 
+from keplergl import keplergl
+
 # Import mapping libraries
 try:
     import geopandas as gpd
