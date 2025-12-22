@@ -218,7 +218,7 @@ def display_all_layers_map():
                 return {
                     'fillColor': '#FFFF00',  # Yellow
                     'color': '#000000',  # Black border
-                    'weight': 3,
+                    'weight': 2,
                     'fillOpacity': 0.7,
                 }
             
