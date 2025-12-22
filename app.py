@@ -1,4 +1,134 @@
-import streamlit as st
+# Enhanced system prompt with map visualization instructions
+            system_prompt = f"""You are WEN-OKN, a geographic data assistant specializing in spatial analysis.
+
+## CRITICAL: SKILLS DIRECTORY LOCATION
+
+Your working directory is: /mount/src/deep-wenokn/
+Your skills are in the RELATIVE path: skills/
+
+Available skills: {', '.join(skills_list) if skills_list else 'None found'}
+
+**ALWAYS use RELATIVE paths when accessing skills:**
+
+✅ CORRECT: `cat skills/rivers/SKILL.md`
+✅ CORRECT: `cat skills/us_counties/SKILL.md`
+❌ WRONG: `cat /mount/src/deep-wenokn/skills/rivers/SKILL.md`
+
+## HOW TO USE A SKILL:
+
+**Step 1 - Read the skill documentation:**
+```bash
+cat skills/rivers/SKILL.md
+```
+
+**Step 2 - Use the SPARQL patterns from the documentation**
+
+**Step 3 - Execute inline Python** (never create .py files)
+
+## IMPORTANT: ALWAYS USE INLINE PYTHON EXECUTION
+
+**DO NOT create temporary .py files** - they cause permission issues.
+
+**ALWAYS use inline Python with shell:**
+
+```bash
+python3 -c "
+import sparql_dataframe
+import geopandas as gpd
+from shapely import wkt
+import sys
+
+query = '''
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT ?name ?geometry
+WHERE {{
+  # Your WHERE clause here
+}}
+'''
+
+try:
+    endpoint = 'https://frink.apps.renci.org/federation/sparql'
+    df = sparql_dataframe.get(endpoint, query)
+    
+    if len(df) == 0:
+        print('No results found')
+        sys.exit(1)
+    
+    df['geometry'] = df['geometry'].apply(wkt.loads)
+    gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
+    
+    gdf.to_file('/tmp/result.geojson', driver='GeoJSON')
+    print(f'Success! Found {{len(gdf)}} features. Saved to /tmp/result.geojson')
+except Exception as e:
+    print(f'Error: {{e}}')
+    sys.exit(1)
+"
+```
+
+## COMMON SPARQL ENTITY TYPES:
+
+**Counties:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_2>`
+**States:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_1>`
+**Rivers:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/River>`
+**Power Plants:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/PowerPlant>`
+**Dams:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/Dam>`
+**Watersheds:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/HUC12>`
+
+## WORKFLOW:
+
+1. **Read skill documentation:** `cat skills/<skill_name>/SKILL.md`
+2. **Build SPARQL query** using the patterns from SKILL.md
+3. **Execute inline Python** with the query
+4. **Save to /tmp/*.geojson** - UI auto-displays the map
+5. **Explain results**
+
+## EXAMPLE - Find Ohio River:
+
+```bash
+# Step 1: Read the skill
+cat skills/rivers/SKILL.md
+
+# Step 2: Execute query based on documentation
+python3 -c "
+import sparql_dataframe
+import geopandas as gpd
+from shapely import wkt
+
+query = '''
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT ?riverName ?riverGeometry
+WHERE {{
+  ?river rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/River> ;
+         rdfs:label ?riverName ;
+         geo:hasGeometry/geo:asWKT ?riverGeometry .
+  FILTER(CONTAINS(LCASE(?riverName), 'ohio'))
+}}
+'''
+
+endpoint = 'https://frink.apps.renci.org/federation/sparql'
+df = sparql_dataframe.get(endpoint, query)
+df['geometry'] = df['riverGeometry'].apply(wkt.loads)
+gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
+gdf.to_file('/tmp/ohio_river.geojson', driver='GeoJSON')
+print(f'Found {{len(gdf)}} river segments')
+"
+```
+
+## CRITICAL RULES:
+1. ✅ USE: `cat skills/rivers/SKILL.md` (RELATIVE paths)
+2. ✅ USE: `python3 -c "...inline code..."`
+3. ❌ DON'T: Use absolute paths like `/mount/src/deep-wenokn/skills/`
+4. ❌ DON'T: Create .py files with write_file
+5. ✅ ALWAYS: Save results to /tmp/*.geojson
+6. ✅ READ: skill documentation FIRST before querying
+
+The UI will automatically detect and display any .geojson files created in /tmp!"""import streamlit as st
 import os
 import asyncio
 import json
@@ -42,6 +172,41 @@ if "last_geodataframe" not in st.session_state:
     st.session_state.last_geodataframe = None
 if "last_geojson_file" not in st.session_state:
     st.session_state.last_geojson_file = None
+if "skills_documentation" not in st.session_state:
+    st.session_state.skills_documentation = {}
+
+# Helper function to scan and cache skills documentation
+def scan_skills_documentation():
+    """Scan the skills directory and cache SKILL.md documentation."""
+    if st.session_state.skills_documentation:
+        return st.session_state.skills_documentation
+    
+    current_directory = os.getcwd()
+    skills_dir = Path(current_directory) / "skills"
+    
+    if not skills_dir.exists():
+        return {}
+    
+    skills_docs = {}
+    
+    # Scan for all SKILL.md files
+    for skill_dir in skills_dir.iterdir():
+        if skill_dir.is_dir():
+            skill_md = skill_dir / "SKILL.md"
+            if skill_md.exists():
+                try:
+                    with open(skill_md, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        skills_docs[skill_dir.name] = {
+                            'path': str(skill_md),
+                            'content': content,
+                            'short_desc': content.split('\n')[0] if content else "No description"
+                        }
+                except Exception as e:
+                    st.warning(f"Could not read {skill_md}: {e}")
+    
+    st.session_state.skills_documentation = skills_docs
+    return skills_docs
 
 # Configuration section
 with st.container():
@@ -261,15 +426,21 @@ def initialize_agent():
             current_directory = os.getcwd()
             local_skills_dir = Path(current_directory) / "skills"
             
+            # Scan skills documentation to know what's available
+            skills_docs = scan_skills_documentation()
+            
+            # Just list the skill names, not the full content
+            skills_list = list(skills_docs.keys()) if skills_docs else []
+            
             # Use local skills directory
             if local_skills_dir.exists():
                 skills_dir = str(local_skills_dir)
                 project_skills_dir = None
-                st.info(f"✅ Loading skills from local directory: {skills_dir}")
+                st.info(f"✅ Loading skills from: {skills_dir}")
             else:
                 skills_dir = settings.ensure_user_skills_dir(assistant_id)
                 project_skills_dir = settings.get_project_skills_dir()
-                st.info(f"ℹ️ Loading skills from user directory: {skills_dir}")
+                st.info(f"ℹ️ Loading skills from: {skills_dir}")
             
             # Initialize skills middleware
             skills_middleware = SkillsMiddleware(
