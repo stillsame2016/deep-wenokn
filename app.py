@@ -68,6 +68,8 @@ for root, dirs, files in os.walk(current_dir):
         full_path = os.path.join(root, file)
         st.markdown(full_path)
 
+st.markdown("====================")
+
 current_dir = st.session_state.temp_dir
 for root, dirs, files in os.walk(current_dir):
     for file in files:
