@@ -217,7 +217,7 @@ def display_all_layers_map():
                     labels=True,
                     style="""
                         background-color: white;
-                        border: 2px solid black;
+                        border: 1px solid black;
                         border-radius: 3px;
                         box-shadow: 3px;
                         font-size: 11px;
