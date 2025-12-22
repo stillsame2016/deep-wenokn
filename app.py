@@ -11,6 +11,8 @@ from langchain.agents.middleware import (
 )
 from langchain_core.messages import HumanMessage, ToolMessage, AIMessage
 from langgraph.types import Command
+import uuid
+import tempfile
 
 from deepagents_cli.skills.middleware import SkillsMiddleware
 from deepagents_cli.config import settings
@@ -26,9 +28,6 @@ except ImportError:
 # Set the wide layout of the web page
 st.set_page_config(layout="wide", page_title="WEN-OKN")
 
-# # Set up the title
-# st.markdown("### 🌍 WEN-OKN: Dive into Data, Never Easier")
-
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -38,12 +37,19 @@ if "skills_loaded" not in st.session_state:
     st.session_state.skills_loaded = False
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
-if "last_geodataframe" not in st.session_state:
-    st.session_state.last_geodataframe = None
-if "last_geojson_file" not in st.session_state:
-    st.session_state.last_geojson_file = None
+if "geodataframes" not in st.session_state:
+    st.session_state.geodataframes = {}  # Dict: {name: gdf}
+if "dataframes" not in st.session_state:
+    st.session_state.dataframes = {}  # Dict: {name: df}
+if "generated_code" not in st.session_state:
+    st.session_state.generated_code = []  # List of code snippets
 if "skills_documentation" not in st.session_state:
     st.session_state.skills_documentation = {}
+if "user_session_id" not in st.session_state:
+    st.session_state.user_session_id = str(uuid.uuid4())[:8]  # Unique per session
+if "temp_dir" not in st.session_state:
+    # Create user-specific temp directory
+    st.session_state.temp_dir = tempfile.mkdtemp(prefix=f"wenokn_{st.session_state.user_session_id}_")
 
 # Helper function to scan and cache skills documentation
 def scan_skills_documentation():
@@ -78,37 +84,14 @@ def scan_skills_documentation():
     st.session_state.skills_documentation = skills_docs
     return skills_docs
 
-# Configuration section
-# with st.container():
-#     col1, col2 = st.columns([2, 1])
-#     with col1:
-#         st.markdown("### ⚙️ Configuration")
-#     with col2:
-#         temperature = st.slider("Temperature", 0.0, 1.0, 0.3, 0.1, key="temp_slider")
-
 # Initialize LLM
 def get_llm():
     return ChatOpenAI(
-            model="glm-4.6",
-            base_url="https://ellm.nrp-nautilus.io/v1",
-            api_key=os.environ.get("NRP_API_KEY") ,
-            temperature=0,
-        )
-
-    # return ChatOpenAI(
-    #     model="mimo-v2-flash",
-    #     base_url="https://api.xiaomimimo.com/v1",
-    #     api_key=st.secrets.get("XIAOMI_API_KEY", os.getenv("XIAOMI_API_KEY", "")),
-    #     temperature=st.session_state.get("temp_slider", 0.3),
-    #     top_p=0.95,
-    #     streaming=True,
-    #     stop=None,
-    #     frequency_penalty=0,
-    #     presence_penalty=0,
-    #     extra_body={
-    #         "thinking": {"type": "disabled"}
-    #     }
-    # )
+        model="glm-4.6",
+        base_url="https://ellm.nrp-nautilus.io/v1",
+        api_key=os.environ.get("NRP_API_KEY"),
+        temperature=0,
+    )
 
 # Helper function to display GeoDataFrame on map
 def display_geodataframe_map(gdf, title="Geographic Data"):
@@ -230,7 +213,7 @@ def display_geodataframe_map(gdf, title="Geographic Data"):
                 st.download_button(
                     label="📥 Download as GeoJSON",
                     data=geojson_str,
-                    file_name="geographic_data.geojson",
+                    file_name=f"{title.replace(' ', '_').lower()}.geojson",
                     mime="application/json",
                 )
             with col2:
@@ -240,7 +223,7 @@ def display_geodataframe_map(gdf, title="Geographic Data"):
                 st.download_button(
                     label="📥 Download as CSV",
                     data=csv_str,
-                    file_name="geographic_data.csv",
+                    file_name=f"{title.replace(' ', '_').lower()}.csv",
                     mime="text/csv",
                 )
     
@@ -250,47 +233,80 @@ def display_geodataframe_map(gdf, title="Geographic Data"):
         with st.expander("🔍 Error Details"):
             st.code(traceback.format_exc())
 
-# Function to check for and display GeoJSON files
-def check_and_display_geojson_files():
-    """Check for GeoJSON files created during execution and display them."""
+# Function to load GeoJSON/CSV files into session state and clean up
+def load_and_cleanup_temp_files():
+    """Load any generated files into session state and clean up temp directory."""
     if not GEOPANDAS_AVAILABLE:
-        st.warning("⚠️ GeoPandas not installed. Cannot display maps. Install with: `pip install geopandas`")
         return
     
-    tmp_dir = Path("/tmp")
+    temp_dir = Path(st.session_state.temp_dir)
     
     try:
-        geojson_files = sorted(tmp_dir.glob("*.geojson"), key=lambda x: x.stat().st_mtime, reverse=True)
-        
-        if geojson_files:
-            # Display the most recent GeoJSON file
-            most_recent = geojson_files[0]
-            
+        # Check for GeoJSON files
+        geojson_files = list(temp_dir.glob("*.geojson"))
+        for gf in geojson_files:
             try:
-                gdf = gpd.read_file(most_recent)
+                gdf = gpd.read_file(gf)
                 if gdf is not None and len(gdf) > 0:
-                    display_geodataframe_map(gdf, title=f"📍 {most_recent.stem.replace('_', ' ').title()}")
-                    st.session_state.last_geodataframe = gdf
-                    st.session_state.last_geojson_file = str(most_recent)
+                    # Store in session state with descriptive name
+                    name = gf.stem
+                    st.session_state.geodataframes[name] = gdf
                     
-                    # Show info about other files if they exist
-                    if len(geojson_files) > 1:
-                        with st.expander(f"📁 {len(geojson_files)-1} other GeoJSON file(s) available"):
-                            for gf in geojson_files[1:]:
-                                st.text(f"• {gf.name}")
-                else:
-                    st.warning(f"⚠️ GeoJSON file {most_recent.name} is empty")
+                    # Display the map
+                    display_geodataframe_map(gdf, title=f"📍 {name.replace('_', ' ').title()}")
+                
+                # Delete the file after loading
+                gf.unlink()
             except Exception as e:
-                st.error(f"❌ Could not read {most_recent.name}: {str(e)}")
-                import traceback
-                with st.expander("🔍 Error Details"):
-                    st.code(traceback.format_exc())
-        else:
-            # No GeoJSON files found - this is OK, just don't show anything
-            pass
-            
+                st.error(f"Error loading {gf.name}: {e}")
+        
+        # Check for CSV files
+        csv_files = list(temp_dir.glob("*.csv"))
+        for cf in csv_files:
+            try:
+                df = pd.read_csv(cf)
+                if df is not None and len(df) > 0:
+                    # Store in session state
+                    name = cf.stem
+                    st.session_state.dataframes[name] = df
+                    
+                    # Display the dataframe
+                    with st.expander(f"📊 {name.replace('_', ' ').title()}"):
+                        st.dataframe(df, use_container_width=True)
+                        
+                        # Download button
+                        csv_str = df.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download CSV",
+                            data=csv_str,
+                            file_name=f"{name}.csv",
+                            mime="text/csv",
+                        )
+                
+                # Delete the file after loading
+                cf.unlink()
+            except Exception as e:
+                st.error(f"Error loading {cf.name}: {e}")
+        
+        # Check for Python files (generated code)
+        py_files = list(temp_dir.glob("*.py"))
+        for pf in py_files:
+            try:
+                with open(pf, 'r') as f:
+                    code = f.read()
+                    st.session_state.generated_code.append({
+                        'name': pf.stem,
+                        'code': code,
+                        'timestamp': pf.stat().st_mtime
+                    })
+                
+                # Delete the file after loading
+                pf.unlink()
+            except Exception as e:
+                st.error(f"Error loading {pf.name}: {e}")
+                
     except Exception as e:
-        st.error(f"❌ Error checking for GeoJSON files: {str(e)}")
+        st.error(f"Error checking temp files: {str(e)}")
 
 # Initialize agent
 def initialize_agent():
@@ -336,7 +352,7 @@ def initialize_agent():
                 ),
             ]
             
-            # Simple, generic system prompt
+            # Updated system prompt with user-specific temp directory
             system_prompt = f"""You are WEN-OKN, a geographic data assistant specializing in spatial analysis.
 
 ## YOUR SKILLS LOCATION
@@ -366,16 +382,33 @@ Each SKILL.md file contains:
 **Step 3: Execute as instructed**
 Follow whatever approach the SKILL.md describes. Different skills work differently.
 
-**Step 4: If the skill generates geographic data**
-Save results to /tmp/*.geojson and the UI will automatically display maps.
+**Step 4: CRITICAL - Save output to user-specific directory**
+Your user-specific temporary directory is: {st.session_state.temp_dir}
+
+When saving files:
+- ✅ SAVE TO: {st.session_state.temp_dir}/filename.geojson
+- ✅ SAVE TO: {st.session_state.temp_dir}/filename.csv
+- ❌ DON'T USE: /tmp/filename.geojson (shared across users - privacy issue!)
+
+Example:
+```python
+gdf.to_file('{st.session_state.temp_dir}/result.geojson', driver='GeoJSON')
+df.to_csv('{st.session_state.temp_dir}/result.csv', index=False)
+```
+
+The system will automatically:
+1. Load these files into the user's session
+2. Display maps/tables
+3. Delete the temporary files (for security)
 
 ## GENERAL BEST PRACTICES
 
 1. Always read SKILL.md first using: shell tool → `cat skills/<skill_name>/SKILL.md`
 2. Follow the exact instructions in the SKILL.md file
-3. For geographic results, save to /tmp/*.geojson for automatic visualization
+3. Save ALL output files to: {st.session_state.temp_dir}/
 4. Use inline Python execution when possible: `python3 -c "..."`
-5. Avoid creating temporary .py files (use inline execution instead)
+5. Avoid creating .py files unless necessary
+6. NEVER save to /tmp/ - always use the user-specific directory above
 
 ## EXAMPLE WORKFLOW
 
@@ -385,10 +418,11 @@ Your approach:
 1. Use shell tool: `cat skills/rivers/SKILL.md`
 2. Read and understand the instructions
 3. Follow the approach described in SKILL.md
-4. Save any geographic output to /tmp/muskingum_river.geojson
-5. Explain what you found
+4. Save output to {st.session_state.temp_dir}/muskingum_river.geojson
+5. The system will automatically load and display it
+6. Explain what you found
 
-Remember: Each skill is unique. Always read its SKILL.md file first and follow those specific instructions."""
+Remember: Each skill is unique. Always read its SKILL.md file first and follow those specific instructions. Always save to the user-specific directory for privacy and security."""
             
             # Create the agent WITHOUT checkpointer
             st.session_state.agent = create_deep_agent(
@@ -593,8 +627,8 @@ async def handle_user_input_async(user_input):
                 response_placeholder.markdown(default_msg)
                 st.session_state.messages.append({"role": "assistant", "content": default_msg})
             
-            # IMPORTANT: Check for and display any GeoJSON files created
-            check_and_display_geojson_files()
+            # IMPORTANT: Load files from temp directory and clean up
+            load_and_cleanup_temp_files()
             
         except Exception as e:
             error_message = f"❌ An error occurred: {str(e)}"
@@ -620,48 +654,42 @@ def handle_user_input(user_input):
         else:
             raise
 
-# Main chat interface
-# st.markdown("## 💬 Chat Interface")
-
-# Control buttons
-col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
-with col2:
-    if st.button("🗑️ Clear", use_container_width=True):
+# Sidebar for data management
+with st.sidebar:
+    st.markdown("### 📊 Session Data")
+    
+    # Show stored GeoDataFrames
+    if st.session_state.geodataframes:
+        st.markdown(f"**🗺️ GeoDataFrames ({len(st.session_state.geodataframes)})**")
+        for name in st.session_state.geodataframes.keys():
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.text(f"• {name}")
+            with col2:
+                if st.button("View", key=f"view_gdf_{name}"):
+                    gdf = st.session_state.geodataframes[name]
+                    display_geodataframe_map(gdf, name.replace('_', ' ').title())
+    
+    # Show stored DataFrames
+    if st.session_state.dataframes:
+        st.markdown(f"**📋 DataFrames ({len(st.session_state.dataframes)})**")
+        for name in st.session_state.dataframes.keys():
+            st.text(f"• {name}")
+    
+    # Show generated code
+    if st.session_state.generated_code:
+        with st.expander(f"💻 Generated Code ({len(st.session_state.generated_code)})"):
+            for item in st.session_state.generated_code:
+                st.markdown(f"**{item['name']}**")
+                st.code(item['code'], language='python')
+    
+    # Clear session button
+    if st.button("🗑️ Clear All Session Data"):
+        st.session_state.geodataframes = {}
+        st.session_state.dataframes = {}
+        st.session_state.generated_code = []
         st.session_state.messages = []
-        st.session_state.conversation_history = []
         st.rerun()
-with col3:
-    if st.button("🗺️ Show Last Map", use_container_width=True):
-        if st.session_state.last_geojson_file and Path(st.session_state.last_geojson_file).exists():
-            try:
-                gdf = gpd.read_file(st.session_state.last_geojson_file)
-                display_geodataframe_map(gdf, f"Map: {Path(st.session_state.last_geojson_file).stem.replace('_', ' ').title()}")
-            except Exception as e:
-                st.error(f"Error loading map: {e}")
-        elif st.session_state.last_geodataframe is not None:
-            display_geodataframe_map(st.session_state.last_geodataframe, "Last Query Results")
-        else:
-            st.warning("No map data available yet. Run a geographic query first!")
-with col4:
-    if st.button("📂 Browse Maps", use_container_width=True):
-        tmp_dir = Path("/tmp")
-        geojson_files = sorted(tmp_dir.glob("*.geojson"), key=lambda x: x.stat().st_mtime, reverse=True)
-        
-        if geojson_files:
-            st.markdown("### 📂 Available GeoJSON Files")
-            for gf in geojson_files:
-                col_a, col_b = st.columns([3, 1])
-                with col_a:
-                    st.text(f"📄 {gf.name}")
-                with col_b:
-                    if st.button("View", key=f"view_{gf.name}"):
-                        try:
-                            gdf = gpd.read_file(gf)
-                            display_geodataframe_map(gdf, f"{gf.stem.replace('_', ' ').title()}")
-                        except Exception as e:
-                            st.error(f"Error: {e}")
-        else:
-            st.info("No GeoJSON files found in /tmp")
 
 # Display existing messages
 display_messages()
