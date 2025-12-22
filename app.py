@@ -243,7 +243,7 @@ def display_all_layers_map():
                         box-shadow: 3px;
                         font-size: 11px;
                         max-width: 300px;
-                        max-height: 400px;
+                        max-height: 200px;
                         overflow-y: auto;
                         padding: 8px;
                     """,
