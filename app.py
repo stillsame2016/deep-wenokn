@@ -26,8 +26,8 @@ except ImportError:
 # Set the wide layout of the web page
 st.set_page_config(layout="wide", page_title="WEN-OKN")
 
-# Set up the title
-st.markdown("### 🌍 WEN-OKN: Dive into Data, Never Easier")
+# # Set up the title
+# st.markdown("### 🌍 WEN-OKN: Dive into Data, Never Easier")
 
 # Initialize session state
 if "messages" not in st.session_state:
@@ -79,12 +79,12 @@ def scan_skills_documentation():
     return skills_docs
 
 # Configuration section
-with st.container():
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.markdown("### ⚙️ Configuration")
-    with col2:
-        temperature = st.slider("Temperature", 0.0, 1.0, 0.3, 0.1, key="temp_slider")
+# with st.container():
+#     col1, col2 = st.columns([2, 1])
+#     with col1:
+#         st.markdown("### ⚙️ Configuration")
+#     with col2:
+#         temperature = st.slider("Temperature", 0.0, 1.0, 0.3, 0.1, key="temp_slider")
 
 # Initialize LLM
 def get_llm():
