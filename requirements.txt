@@ -2,3 +2,4 @@ deepagents-cli
 geopandas
 pandas
 sparql-dataframe
+streamlit-kepler-component
