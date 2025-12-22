@@ -137,12 +137,40 @@ Use the following condition:
 
 **User Request:** "Find all coal mines in Ohio"
 
-**Approach:**
-
-Use the following condition: 
-
 ```
-   where = f"PrimSource='Coal' AND State='Ohio'"   
+import geopandas as gpd
+import requests
+
+def get_features(self_url, where, bbox=None):
+    if bbox is None:
+        bbox = [-125.0, 24.396308, -66.93457, 49.384358]
+    minx, miny, maxx, maxy = bbox
+    params = {
+        "where": where,
+        "geometry": f"{minx},{miny},{maxx},{maxy}",
+        "geometryType": "esriGeometryEnvelope",
+        "spatialRel": "esriSpatialRelIntersects",
+        "outFields": "*",
+        "returnGeometry": "true",
+        "f": "geojson",
+        "outSR": "4326",
+        "resultOffset": 0,
+        "resultRecordCount": 1000
+    }
+
+    response = requests.get(self_url + "/query", params=params)
+    data = response.json()
+    
+    if data['features']:
+        return gpd.GeoDataFrame.from_features(data['features'])
+    else:
+        return gpd.GeoDataFrame(columns=['geometry'])
+
+# Get all coal power plants in Ohio
+url = "https://services2.arcgis.com/FiaPA4ga0iQKduv3/ArcGIS/rest/services/Power_Plants_in_the_US/FeatureServer/0"
+where = f"PrimSource='Coal' AND State='Ohio'"
+ohio_coal_plants = get_features(url, where)
+
 ```
 
 ## Notes:
