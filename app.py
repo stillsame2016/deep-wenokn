@@ -192,15 +192,10 @@ def display_all_layers_map():
         
         # A professional, muted palette for mapping
         colors = [
-            '#4A6D8C',  # Slate Blue (Water/Rivers)
-            '#556B2F',  # Dark Olive Green (Parks/Nature)
-            '#7E6B8F',  # Muted Purple (Boundaries)
-            '#A68069',  # Soft Brown (Urban/Land)
-            '#5F9EA0',  # Cadet Blue (Infrastructure)
-            '#C27E7E',  # Dusty Rose (Highlights)
-            '#483D8B',  # Dark Slate Blue
-            '#8FBC8F',  # Dark Sea Green
-            '#BC8F8F'   # Rosy Brown
+            '#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F', 
+            '#EDC948', '#B07AA1', '#FF9DA7', '#9C755F', '#BAB0AC',
+            '#1F77B4', '#FF7F0E', '#2CA02C', '#D62728', '#9467BD', 
+            '#8C564B', '#E377C2', '#7F7F7F', '#BCBD22', '#17BECF'
         ]
         
         # Add each geodataframe as a layer
