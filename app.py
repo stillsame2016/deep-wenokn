@@ -17,8 +17,6 @@ import tempfile
 from deepagents_cli.skills.middleware import SkillsMiddleware
 from deepagents_cli.config import settings
 
-from keplergl import keplergl
-
 # Import mapping libraries
 try:
     import geopandas as gpd
@@ -26,6 +24,14 @@ try:
     GEOPANDAS_AVAILABLE = True
 except ImportError:
     GEOPANDAS_AVAILABLE = False
+
+try:
+    import folium
+    from folium import plugins
+    from streamlit_folium import st_folium
+    FOLIUM_AVAILABLE = True
+except ImportError:
+    FOLIUM_AVAILABLE = False
 
 # Set the wide layout of the web page
 st.set_page_config(layout="wide", page_title="WEN-OKN")
@@ -99,18 +105,16 @@ def get_llm():
 
 # Function to display all GeoDataFrames as layers on a single map
 def display_all_layers_map():
-    """Display all GeoDataFrames as layers on a single interactive map."""
+    """Display all GeoDataFrames as layers on a single interactive Folium map."""
     if not st.session_state.geodataframes:
         st.info("No geographic data available yet. Start a conversation to generate maps!")
         return
     
+    if not FOLIUM_AVAILABLE:
+        st.error("⚠️ Folium not available. Install with: `pip install folium streamlit-folium`")
+        return
+    
     try:
-        st.markdown(f"========> {len(st.session_state.geodataframes)} ")
-        options = {"keepExistingConfig": True}
-        map_config = keplergl(st.session_state.geodataframes, options=options, config=None, height=460)
-        
-        import pydeck as pdk
-        
         # Calculate overall bounds from all geodataframes
         all_bounds = []
         for gdf in st.session_state.geodataframes.values():
@@ -118,7 +122,7 @@ def display_all_layers_map():
                 gdf = gdf.to_crs(epsg=4326)
             all_bounds.append(gdf.total_bounds)
         
-        # Calculate center and zoom
+        # Calculate center
         if all_bounds:
             min_x = min(b[0] for b in all_bounds)
             min_y = min(b[1] for b in all_bounds)
@@ -127,88 +131,151 @@ def display_all_layers_map():
             
             center_lat = (min_y + max_y) / 2
             center_lon = (min_x + max_x) / 2
-            
-            lat_diff = max_y - min_y
-            lon_diff = max_x - min_x
-            max_diff = max(lat_diff, lon_diff)
-            
-            if max_diff > 10:
-                zoom = 5
-            elif max_diff > 5:
-                zoom = 6
-            elif max_diff > 2:
-                zoom = 7
-            elif max_diff > 1:
-                zoom = 8
-            else:
-                zoom = 9
         else:
-            center_lat, center_lon, zoom = 39.8, -98.6, 4  # Center of US
+            center_lat, center_lon = 39.8, -98.6  # Center of US
         
-        # Create layers for each geodataframe
-        layers = []
-        colors = [
-            [0, 100, 200, 140],
-            [200, 0, 100, 140],
-            [100, 200, 0, 140],
-            [200, 100, 0, 140],
-            [100, 0, 200, 140],
-        ]
+        # Create the base map with multiple tile options
+        m = folium.Map(
+            location=[center_lat, center_lon],
+            zoom_start=8,
+            tiles=None,  # We'll add tiles manually
+            control_scale=True
+        )
         
+        # Add multiple basemap options
+        folium.TileLayer(
+            tiles='OpenStreetMap',
+            name='Street Map',
+            overlay=False,
+            control=True
+        ).add_to(m)
+        
+        folium.TileLayer(
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri',
+            name='Satellite',
+            overlay=False,
+            control=True
+        ).add_to(m)
+        
+        folium.TileLayer(
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri',
+            name='Topographic',
+            overlay=False,
+            control=True
+        ).add_to(m)
+        
+        folium.TileLayer(
+            tiles='CartoDB positron',
+            name='Light',
+            overlay=False,
+            control=True
+        ).add_to(m)
+        
+        # Define colors for different layers
+        colors = ['blue', 'red', 'green', 'purple', 'orange', 'darkred', 'lightred', 
+                  'beige', 'darkblue', 'darkgreen', 'cadetblue', 'darkpurple', 'pink']
+        
+        # Add each geodataframe as a layer
         for idx, (name, gdf) in enumerate(st.session_state.geodataframes.items()):
+            # Ensure WGS84
             if gdf.crs and gdf.crs.to_epsg() != 4326:
                 gdf = gdf.to_crs(epsg=4326)
             
-            geojson = json.loads(gdf.to_json())
             color = colors[idx % len(colors)]
             
-            layer = pdk.Layer(
-                "GeoJsonLayer",
-                geojson,
-                opacity=0.6,
-                stroked=True,
-                filled=True,
-                extruded=False,
-                wireframe=True,
-                get_fill_color=color,
-                get_line_color=[255, 255, 255],
-                line_width_min_pixels=2,
-                pickable=True,
+            # Create a feature group for this layer (allows toggling)
+            feature_group = folium.FeatureGroup(name=name.replace('_', ' ').title(), show=True)
+            
+            # Add GeoJSON to the feature group
+            style_function = lambda x, c=color: {
+                'fillColor': c,
+                'color': 'black',
+                'weight': 2,
+                'fillOpacity': 0.4,
+            }
+            
+            highlight_function = lambda x: {
+                'fillColor': 'yellow',
+                'color': 'black',
+                'weight': 3,
+                'fillOpacity': 0.7,
+            }
+            
+            # Create tooltip with all attributes
+            tooltip_fields = [col for col in gdf.columns if col != 'geometry']
+            tooltip = folium.GeoJsonTooltip(
+                fields=tooltip_fields if tooltip_fields else [],
+                aliases=[f"{field}:" for field in tooltip_fields] if tooltip_fields else [],
+                localize=True,
+                sticky=False,
+                labels=True,
+                style="""
+                    background-color: white;
+                    border: 2px solid black;
+                    border-radius: 3px;
+                    box-shadow: 3px;
+                """,
             )
-            layers.append(layer)
+            
+            folium.GeoJson(
+                gdf,
+                style_function=style_function,
+                highlight_function=highlight_function,
+                tooltip=tooltip,
+                name=name.replace('_', ' ').title()
+            ).add_to(feature_group)
+            
+            feature_group.add_to(m)
         
-        # Set the viewport
-        view_state = pdk.ViewState(
-            latitude=center_lat,
-            longitude=center_lon,
-            zoom=zoom,
-            pitch=0,
+        # Add layer control
+        folium.LayerControl(position='topright', collapsed=False).add_to(m)
+        
+        # Add fullscreen button
+        plugins.Fullscreen(
+            position='topleft',
+            title='Fullscreen',
+            title_cancel='Exit Fullscreen',
+            force_separate_button=True
+        ).add_to(m)
+        
+        # Add measure control
+        plugins.MeasureControl(
+            position='topleft',
+            primary_length_unit='kilometers',
+            secondary_length_unit='miles',
+            primary_area_unit='sqkilometers',
+            secondary_area_unit='acres'
+        ).add_to(m)
+        
+        # Add mouse position
+        plugins.MousePosition().add_to(m)
+        
+        # Add minimap
+        minimap = plugins.MiniMap(toggle_display=True)
+        m.add_child(minimap)
+        
+        # Fit bounds to show all layers
+        if all_bounds:
+            southwest = [min_y, min_x]
+            northeast = [max_y, max_x]
+            m.fit_bounds([southwest, northeast], padding=[50, 50])
+        
+        # Display the map
+        st_folium(
+            m,
+            width=None,  # Use full width
+            height=700,
+            returned_objects=[],
+            use_container_width=True
         )
         
-        # Render the map
-        r = pdk.Deck(
-            layers=layers,
-            initial_view_state=view_state,
-            tooltip={"text": "{properties}"},
-            map_style="mapbox://styles/mapbox/streets-v12",
-        )
-        
-        st.pydeck_chart(r, use_container_width=True, height=700)
-        
-    except ImportError:
-        # Fallback if pydeck not available
-        st.warning("⚠️ PyDeck not available. Install with: `pip install pydeck`")
-        
-        # Simple fallback using streamlit map
-        all_points = []
-        for gdf in st.session_state.geodataframes.values():
-            if gdf.crs and gdf.crs.to_epsg() != 4326:
-                gdf = gdf.to_crs(epsg=4326)
-            centroids = gdf.geometry.centroid
-            all_points.extend([{"lat": p.y, "lon": p.x} for p in centroids])
-        
-        if all_points:
-            st.map(pd.DataFrame(all_points))
+        # Display map legend
+        with st.expander("🎨 Map Legend", expanded=False):
+            for idx, name in enumerate(st.session_state.geodataframes.keys()):
+                color = colors[idx % len(colors)]
+                st.markdown(f"🟦 **{name.replace('_', ' ').title()}** - {color}")
     
     except Exception as e:
         st.error(f"Error displaying map: {str(e)}")
