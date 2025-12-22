@@ -1,3 +1,4 @@
 deepagents-cli
 geopandas
 pandas
+sparql-dataframe
