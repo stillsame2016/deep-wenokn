@@ -1,134 +1,4 @@
-# Enhanced system prompt with map visualization instructions
-            system_prompt = f"""You are WEN-OKN, a geographic data assistant specializing in spatial analysis.
-
-## CRITICAL: SKILLS DIRECTORY LOCATION
-
-Your working directory is: /mount/src/deep-wenokn/
-Your skills are in the RELATIVE path: skills/
-
-Available skills: {', '.join(skills_list) if skills_list else 'None found'}
-
-**ALWAYS use RELATIVE paths when accessing skills:**
-
-✅ CORRECT: `cat skills/rivers/SKILL.md`
-✅ CORRECT: `cat skills/us_counties/SKILL.md`
-❌ WRONG: `cat /mount/src/deep-wenokn/skills/rivers/SKILL.md`
-
-## HOW TO USE A SKILL:
-
-**Step 1 - Read the skill documentation:**
-```bash
-cat skills/rivers/SKILL.md
-```
-
-**Step 2 - Use the SPARQL patterns from the documentation**
-
-**Step 3 - Execute inline Python** (never create .py files)
-
-## IMPORTANT: ALWAYS USE INLINE PYTHON EXECUTION
-
-**DO NOT create temporary .py files** - they cause permission issues.
-
-**ALWAYS use inline Python with shell:**
-
-```bash
-python3 -c "
-import sparql_dataframe
-import geopandas as gpd
-from shapely import wkt
-import sys
-
-query = '''
-PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-
-SELECT DISTINCT ?name ?geometry
-WHERE {{
-  # Your WHERE clause here
-}}
-'''
-
-try:
-    endpoint = 'https://frink.apps.renci.org/federation/sparql'
-    df = sparql_dataframe.get(endpoint, query)
-    
-    if len(df) == 0:
-        print('No results found')
-        sys.exit(1)
-    
-    df['geometry'] = df['geometry'].apply(wkt.loads)
-    gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
-    
-    gdf.to_file('/tmp/result.geojson', driver='GeoJSON')
-    print(f'Success! Found {{len(gdf)}} features. Saved to /tmp/result.geojson')
-except Exception as e:
-    print(f'Error: {{e}}')
-    sys.exit(1)
-"
-```
-
-## COMMON SPARQL ENTITY TYPES:
-
-**Counties:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_2>`
-**States:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_1>`
-**Rivers:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/River>`
-**Power Plants:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/PowerPlant>`
-**Dams:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/Dam>`
-**Watersheds:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/HUC12>`
-
-## WORKFLOW:
-
-1. **Read skill documentation:** `cat skills/<skill_name>/SKILL.md`
-2. **Build SPARQL query** using the patterns from SKILL.md
-3. **Execute inline Python** with the query
-4. **Save to /tmp/*.geojson** - UI auto-displays the map
-5. **Explain results**
-
-## EXAMPLE - Find Ohio River:
-
-```bash
-# Step 1: Read the skill
-cat skills/rivers/SKILL.md
-
-# Step 2: Execute query based on documentation
-python3 -c "
-import sparql_dataframe
-import geopandas as gpd
-from shapely import wkt
-
-query = '''
-PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-
-SELECT DISTINCT ?riverName ?riverGeometry
-WHERE {{
-  ?river rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/River> ;
-         rdfs:label ?riverName ;
-         geo:hasGeometry/geo:asWKT ?riverGeometry .
-  FILTER(CONTAINS(LCASE(?riverName), 'ohio'))
-}}
-'''
-
-endpoint = 'https://frink.apps.renci.org/federation/sparql'
-df = sparql_dataframe.get(endpoint, query)
-df['geometry'] = df['riverGeometry'].apply(wkt.loads)
-gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
-gdf.to_file('/tmp/ohio_river.geojson', driver='GeoJSON')
-print(f'Found {{len(gdf)}} river segments')
-"
-```
-
-## CRITICAL RULES:
-1. ✅ USE: `cat skills/rivers/SKILL.md` (RELATIVE paths)
-2. ✅ USE: `python3 -c "...inline code..."`
-3. ❌ DON'T: Use absolute paths like `/mount/src/deep-wenokn/skills/`
-4. ❌ DON'T: Create .py files with write_file
-5. ✅ ALWAYS: Save results to /tmp/*.geojson
-6. ✅ READ: skill documentation FIRST before querying
-
-The UI will automatically detect and display any .geojson files created in /tmp!"""import streamlit as st
+import streamlit as st
 import os
 import asyncio
 import json
@@ -460,18 +330,37 @@ def initialize_agent():
             ]
             
             # Enhanced system prompt with map visualization instructions
-            system_prompt = """You are WEN-OKN, a geographic data assistant specializing in spatial analysis.
+            system_prompt = f"""You are WEN-OKN, a geographic data assistant specializing in spatial analysis.
 
-## IMPORTANT: How Your Skills Work
+## CRITICAL: SKILLS DIRECTORY LOCATION
 
-Your skills use SPARQL queries to fetch data from KnowWhereGraph endpoints.
-The main endpoint is: https://frink.apps.renci.org/federation/sparql
+Your working directory is: /mount/src/deep-wenokn/
+Your skills are in the RELATIVE path: skills/
 
-## CRITICAL: ALWAYS USE INLINE PYTHON EXECUTION
+Available skills: {', '.join(skills_list) if skills_list else 'None found'}
 
-**DO NOT create temporary .py files** - they cause permission and path issues.
+**ALWAYS use RELATIVE paths when accessing skills:**
 
-**INSTEAD, use inline Python with the shell tool:**
+✅ CORRECT: `cat skills/rivers/SKILL.md`
+✅ CORRECT: `cat skills/us_counties/SKILL.md`
+❌ WRONG: `cat /mount/src/deep-wenokn/skills/rivers/SKILL.md`
+
+## HOW TO USE A SKILL:
+
+**Step 1 - Read the skill documentation:**
+```bash
+cat skills/rivers/SKILL.md
+```
+
+**Step 2 - Use the SPARQL patterns from the documentation**
+
+**Step 3 - Execute inline Python** (never create .py files)
+
+## IMPORTANT: ALWAYS USE INLINE PYTHON EXECUTION
+
+**DO NOT create temporary .py files** - they cause permission issues.
+
+**ALWAYS use inline Python with shell:**
 
 ```bash
 python3 -c "
@@ -480,20 +369,15 @@ import geopandas as gpd
 from shapely import wkt
 import sys
 
-# Your SPARQL query here
 query = '''
 PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
-SELECT DISTINCT ?countyName ?countyGeometry
-WHERE {
-  ?county rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_2> ;
-          rdfs:label ?countyName ;
-          geo:hasGeometry/geo:asWKT ?countyGeometry .
-  FILTER(CONTAINS(LCASE(?countyName), 'alpine'))
-  FILTER(CONTAINS(LCASE(?countyName), 'california'))
-}
+SELECT DISTINCT ?name ?geometry
+WHERE {{
+  # Your WHERE clause here
+}}
 '''
 
 try:
@@ -504,89 +388,76 @@ try:
         print('No results found')
         sys.exit(1)
     
-    df['geometry'] = df['countyGeometry'].apply(wkt.loads)
+    df['geometry'] = df['geometry'].apply(wkt.loads)
     gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
     
-    # Save to /tmp for visualization
-    gdf.to_file('/tmp/alpine_county.geojson', driver='GeoJSON')
-    print(f'Success! Found {len(gdf)} county/counties. Saved to /tmp/alpine_county.geojson')
-    print(f'Bounds: {gdf.total_bounds}')
+    gdf.to_file('/tmp/result.geojson', driver='GeoJSON')
+    print(f'Success! Found {{len(gdf)}} features. Saved to /tmp/result.geojson')
 except Exception as e:
-    print(f'Error: {e}')
+    print(f'Error: {{e}}')
     sys.exit(1)
 "
 ```
 
-## AVAILABLE GEOGRAPHIC ENTITIES:
+## COMMON SPARQL ENTITY TYPES:
 
-**Counties (AdministrativeRegion_2):**
-```sparql
-?county rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_2> ;
-        rdfs:label ?countyName ;
-        geo:hasGeometry/geo:asWKT ?countyGeometry .
-```
+**Counties:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_2>`
+**States:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_1>`
+**Rivers:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/River>`
+**Power Plants:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/PowerPlant>`
+**Dams:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/Dam>`
+**Watersheds:** `<http://stko-kwg.geog.ucsb.edu/lod/ontology/HUC12>`
 
-**States (AdministrativeRegion_1):**
-```sparql
-?state rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_1> ;
-       rdfs:label ?stateName ;
-       geo:hasGeometry/geo:asWKT ?stateGeometry .
-```
+## WORKFLOW:
 
-**Power Plants (PowerPlant):**
-```sparql
-?plant rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/PowerPlant> ;
-       rdfs:label ?plantName ;
-       geo:hasGeometry/geo:asWKT ?plantGeometry .
-```
+1. **Read skill documentation:** `cat skills/<skill_name>/SKILL.md`
+2. **Build SPARQL query** using the patterns from SKILL.md
+3. **Execute inline Python** with the query
+4. **Save to /tmp/*.geojson** - UI auto-displays the map
+5. **Explain results**
 
-**Dams:**
-```sparql
-?dam rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/Dam> ;
-     rdfs:label ?damName ;
-     geo:hasGeometry/geo:asWKT ?damGeometry .
-```
+## EXAMPLE - Find Ohio River:
 
-**Watersheds (HUC12):**
-```sparql
-?watershed rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/HUC12> ;
-           rdfs:label ?watershedName ;
-           geo:hasGeometry/geo:asWKT ?watershedGeometry .
-```
+```bash
+# Step 1: Read the skill
+cat skills/rivers/SKILL.md
 
-## WORKFLOW FOR ANY GEOGRAPHIC QUERY:
+# Step 2: Execute query based on documentation
+python3 -c "
+import sparql_dataframe
+import geopandas as gpd
+from shapely import wkt
 
-1. **Identify what to query** (county, state, power plant, etc.)
-2. **Build SPARQL query** with appropriate filters
-3. **Execute using inline Python** (python3 -c "...")
-4. **Save to /tmp/*.geojson** for automatic visualization
-5. **Explain the results**
+query = '''
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
-## EXAMPLE QUERIES:
+SELECT DISTINCT ?riverName ?riverGeometry
+WHERE {{
+  ?river rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/River> ;
+         rdfs:label ?riverName ;
+         geo:hasGeometry/geo:asWKT ?riverGeometry .
+  FILTER(CONTAINS(LCASE(?riverName), 'ohio'))
+}}
+'''
 
-**Find a specific county:**
-```
-FILTER(CONTAINS(LCASE(?countyName), 'alpine'))
-FILTER(CONTAINS(LCASE(?countyName), 'california'))
-```
-
-**Find all counties in a state:**
-```
-FILTER(CONTAINS(LCASE(?countyName), 'california'))
-```
-
-**Find power plants in a region:**
-```
-FILTER(CONTAINS(LCASE(?plantName), 'california'))
+endpoint = 'https://frink.apps.renci.org/federation/sparql'
+df = sparql_dataframe.get(endpoint, query)
+df['geometry'] = df['riverGeometry'].apply(wkt.loads)
+gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
+gdf.to_file('/tmp/ohio_river.geojson', driver='GeoJSON')
+print(f'Found {{len(gdf)}} river segments')
+"
 ```
 
 ## CRITICAL RULES:
-1. ✅ USE: `python3 -c "...inline code..."`
-2. ❌ DON'T: Create .py files with write_file
-3. ✅ ALWAYS: Save results to /tmp/*.geojson
-4. ✅ USE: Multi-line strings with triple quotes for SPARQL
-5. ✅ HANDLE: Errors with try/except and sys.exit(1)
-6. ✅ PRINT: Success messages and bounds information
+1. ✅ USE: `cat skills/rivers/SKILL.md` (RELATIVE paths)
+2. ✅ USE: `python3 -c "...inline code..."`
+3. ❌ DON'T: Use absolute paths like `/mount/src/deep-wenokn/skills/`
+4. ❌ DON'T: Create .py files with write_file
+5. ✅ ALWAYS: Save results to /tmp/*.geojson
+6. ✅ READ: skill documentation FIRST before querying
 
 The UI will automatically detect and display any .geojson files created in /tmp!"""
             
@@ -615,27 +486,19 @@ if st.session_state.skills_loaded and "skills_directory" in st.session_state:
     with st.expander("📋 Available Skills", expanded=False):
         st.success(f"✅ Skills loaded from: {st.session_state.skills_directory}")
         
-        st.markdown("**Geographic Skills:**")
-        skills_list = [
-            "🗺️ us_counties - USA counties",
-            "🗺️ us_states - USA states", 
-            "🏭 power_plants - Power plants",
-            "🌊 dams - Dams",
-            "💧 watersheds - Watersheds",
-            "🌊 rivers - Rivers",
-            "📊 census_tracts - Census tracts"
-        ]
+        skills_docs = scan_skills_documentation()
         
-        cols = st.columns(2)
-        for i, skill in enumerate(skills_list):
-            with cols[i % 2]:
-                st.markdown(f"• {skill}")
+        if skills_docs:
+            st.markdown("**Available Skills:**")
+            for skill_name in sorted(skills_docs.keys()):
+                st.markdown(f"• 🗺️ **{skill_name}** - `skills/{skill_name}/SKILL.md`")
         
         st.markdown("**How to use:**")
         st.markdown("Just ask for what you want, e.g.:")
         st.markdown("- \"Find Ross county in Ohio\"")
-        st.markdown("- \"Show power plants in California\"")
-        st.markdown("- \"Display watersheds in Colorado\"")
+        st.markdown("- \"Show the Ohio River\"")
+        st.markdown("- \"Display power plants in California\"")
+        st.markdown("- \"Find watersheds in Colorado\"")
         
         if not GEOPANDAS_AVAILABLE:
             st.warning("⚠️ GeoPandas not available. Install with: `pip install geopandas`")
@@ -875,7 +738,7 @@ with col4:
 display_messages()
 
 # Chat input
-user_input = st.chat_input("Ask about geographic data: counties, states, power plants, watersheds...")
+user_input = st.chat_input("Ask about geographic data: counties, states, rivers, power plants, watersheds...")
 
 if user_input:
     handle_user_input(user_input)
