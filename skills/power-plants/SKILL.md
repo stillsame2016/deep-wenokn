@@ -1,0 +1,152 @@
+---
+name: power-plants
+description: Use this skill for the requests related to the power plants in USA; it provides a way to get power plants as a GeoDataframe in GeoPandas
+---
+
+# power-plants Skill
+
+## Description
+
+This skill gets the geometries and other attributes of power plants in USA by accessing the ArcGIS Feature Service at the following URL:
+
+    https://services2.arcgis.com/FiaPA4ga0iQKduv3/ArcGIS/rest/services/Power_Plants_in_the_US/FeatureServer/0
+
+It returns the following columns:     
+
+FID — Feature ID (OID, primary key)
+OBJECTID — Object ID
+Plant_Code — EIA plant identification number
+Plant_Name — Power plant name
+Utility_ID — EIA utility identifier
+Utility_Na — Utility name (operations)
+sector_nam — Plant-level sector
+Street_Add — Street address
+City — City
+County — County
+State — State
+Zip — Zip code
+PrimSource — Primary energy source
+source_des — Energy sources and summer capacities
+tech_desc — Generator technology / prime mover description
+Install_MW — Installed nameplate capacity (MW)
+Total_MW — Maximum output (MW)
+Bat_MW — Battery capacity (MW)
+Bio_MW — Biomass capacity (MW)
+Coal_MW — Coal capacity (MW)
+Geo_MW — Geothermal capacity (MW)
+Hydro_MW — Hydroelectric capacity (MW)
+HydroPS_MW — Pumped-storage hydro capacity (MW)
+NG_MW — Natural gas capacity (MW)
+Nuclear_MW — Nuclear capacity (MW)
+Crude_MW — Petroleum capacity (MW)
+Solar_MW — Solar capacity (MW)
+Wind_MW — Wind capacity (MW)
+Other_MW — Other/unspecified energy capacity (MW)
+Source — EIA data source reference
+Period — Reporting period (yyyymm)
+Longitude / Latitude — Plant location coordinates
+
+## When to Use
+
+- Find a power plant by a name
+- Find power plants in a region
+- Find power plants with some spatial conditions
+
+### Step 1: Construct a condition
+
+Using the condition "PrimSource='Solar'" for solar power plants.
+
+Using the condition "PrimSource='Wind'" for wind power plants.
+
+Using the condition "PrimSource='Biomass'" for renewable diesel fuel and other biofuel power plants.
+
+Using the condition "PrimSource='Battery'" for battery storage power plants.
+
+Using the condition "PrimSource='Geothermal'" for geothermal power plants.
+
+Using the condition "PrimSource='Pumped storage'" for hydro pumped storage power plants.
+
+Using the condition "PrimSource='Natural gas'" for natural gas power plants.
+
+Using the condition "PrimSource='Nuclear'" for nuclear power plants.
+
+Using the condition "PrimSource='Petroleum'" for petroleum power plants.
+
+Using the condition "PrimSource='Solar'" for solar power plants.
+
+Using the condition "PrimSource='Hydroelectric'" for hydroelectric power plants.
+
+
+### Step 2: Figure out the bounding box of the querying region if possible
+
+For example, to find all power plants within 1000 meters from a river, you can use the bounding box of the river.
+
+### Step 3: Use the following way to make a request:
+
+```
+import geopandas as gpd
+
+def get_features(self_url, where, bbox=None):
+    if bbox is None:
+        bbox = [-125.0, 24.396308, -66.93457, 49.384358]
+    minx, miny, maxx, maxy = bbox
+    params = {
+        "where": where,
+        "geometry": f"{minx},{miny},{maxx},{maxy}",
+        "geometryType": "esriGeometryEnvelope",
+        "spatialRel": "esriSpatialRelIntersects",
+        "outFields": "*",
+        "returnGeometry": "true",
+        "f": "geojson",
+        "outSR": "4326",  # Ensure output is in WGS84                                                                                                                
+        "resultOffset": 0,
+        "resultRecordCount": 1000  # Increase this if needed                                                                                                         
+    }
+
+    response = requests.get(self_url + "/query", params=params)
+    data = response.json()
+    # st.code(response.url)
+    # st.code(data)
+    if data['features']:
+        return gpd.GeoDataFrame.from_features(data['features'])
+    else:
+        return gpd.GeoDataFrame(columns=['geometry'])
+
+
+url = "https://services2.arcgis.com/FiaPA4ga0iQKduv3/ArcGIS/rest/services/Power_Plants_in_the_US/FeatureServer/0 "
+where = f"PrimSource='Coal'"      # find coal power plants
+load_features(self_url, where)
+
+```
+
+## Examples
+
+### Example 1: Find a power plants by a name
+
+**User Request:** "Find the coal power plant 'XYZ' "
+
+**Approach:**
+ 
+Use the following condition:
+
+```
+   where = f"PrimSource='Coal' AND Plant_Name='XYZ'"
+```
+
+### Example 2: Find all coal mines in a state
+
+**User Request:** "Find all coal mines in Ohio"
+
+**Approach:**
+
+Use the following condition: 
+
+```
+   where = f"PrimSource='Coal' AND State='Ohio'"   
+```
+
+## Notes:
+
+For the power plants at risk of flooding, use the skill assets_at_flood_risk
+
+Use the skill assets_at_flood_risk to find power plants at risk of flooding.
