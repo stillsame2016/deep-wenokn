@@ -623,7 +623,7 @@ def handle_user_input(user_input):
 # Main chat interface
 # st.markdown("## 💬 Chat Interface")
 
-Control buttons
+# Control buttons
 col1, col2, col3, col4 = st.columns([4, 1, 1, 1])
 with col2:
     if st.button("🗑️ Clear", use_container_width=True):
