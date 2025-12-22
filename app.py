@@ -68,13 +68,13 @@ if "current_view" not in st.session_state:
 #         full_path = os.path.join(root, file)
 #         st.markdown(full_path)
 
-# current_dir = st.session_state.temp_dir
-# st.markdown(f"==================== {current_dir}")
-# for root, dirs, files in os.walk(current_dir):
-#     for file in files:
-#         # Join the root path and filename to get the full path
-#         full_path = os.path.join(root, file)
-#         st.markdown(full_path)
+current_dir = st.session_state.temp_dir
+st.markdown(f"==================== {current_dir}")
+for root, dirs, files in os.walk(current_dir):
+    for file in files:
+        # Join the root path and filename to get the full path
+        full_path = os.path.join(root, file)
+        st.markdown(full_path)
 
 
 
