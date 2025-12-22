@@ -206,7 +206,7 @@ def display_all_layers_map():
                 }
             
             # Create tooltip with attributes (excluding geometry)
-            tooltip_fields = [col for col in gdf.columns if col not in ['geometry', 'Geometry', 'GEOMETRY']]
+            tooltip_fields = [col for col in gdf.columns if col.lower() not in ['geometry', 'geom', 'the_geom', 'shape', 'countygeometry', 'rivergeometry', 'stategeometry', 'watershedgeometry', 'damgeometry', 'plantgeometry']]
             
             if tooltip_fields:
                 tooltip = folium.GeoJsonTooltip(
@@ -280,9 +280,9 @@ def display_all_layers_map():
         # Add mouse position
         plugins.MousePosition().add_to(m)
         
-        # Add minimap
-        minimap = plugins.MiniMap(toggle_display=True)
-        m.add_child(minimap)
+        # Don't add minimap - removed per user request
+        # minimap = plugins.MiniMap(toggle_display=True)
+        # m.add_child(minimap)
         
         # Fit bounds to show all layers
         if all_bounds:
