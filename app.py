@@ -473,6 +473,7 @@ The system will automatically:
 5. Avoid creating .py files unless necessary
 6. NEVER save to /tmp/ - always use the user-specific directory above
 7. Remove auxiliary data that aids in generating results, retaining only data directly related to the results.
+8. Never save .py under the skills folder.
 
 ## EXAMPLE WORKFLOW
 
