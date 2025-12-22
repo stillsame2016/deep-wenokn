@@ -248,8 +248,17 @@ def display_all_layers_map():
             else:
                 tooltip = None
             
+            # Define the marker style for points
+            point_marker = folium.CircleMarker(
+                radius=5,           # Size in pixels
+                weight=1,           # Border thickness
+                fill=True,
+                fill_opacity=0.7
+            )
+            
             folium.GeoJson(
                 gdf,
+                marker=point_marker,
                 style_function=style_function,
                 highlight_function=highlight_function,
                 tooltip=tooltip,
