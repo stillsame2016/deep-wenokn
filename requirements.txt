@@ -1,6 +1,7 @@
 deepagents-cli
 geopandas
 pandas
+numpy
 sparql-dataframe
 streamlit-kepler-component
 folium>=0.15.0
