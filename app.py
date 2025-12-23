@@ -258,9 +258,14 @@ def display_all_layers_map():
                 fill=True,
                 fill_opacity=0.7
             )
-            
+
+            gdf_display = gdf.copy()
+            for col in gdf_display.columns:
+                if pd.api.types.is_datetime64_any_dtype(gdf_display[col]):
+                    gdf_display[col] = gdf_display[col].astype(str)
+        
             folium.GeoJson(
-                gdf,
+                gdf_display,
                 marker=point_marker,
                 style_function=style_function,
                 highlight_function=highlight_function,
