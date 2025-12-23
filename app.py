@@ -726,8 +726,8 @@ with st.sidebar:
     # st.markdown("---")
     
     # Show layer count
-    num_layers = len(st.session_state.geodataframes)
-    st.markdown(f"**Map Layers:** {num_layers}")
+    # num_layers = len(st.session_state.geodataframes)
+    # st.markdown(f"**Map Layers:** {num_layers}")
     
     if st.button("Clear All Data", use_container_width=True):
         st.session_state.geodataframes = {}
