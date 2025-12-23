@@ -684,7 +684,7 @@ def handle_user_input(user_input):
 
 # ========== SIDEBAR ==========
 with st.sidebar:
-    st.markdown("## 🌍 WEN-OKN")
+    # st.markdown("## 🌍 WEN-OKN")
     
     # Add custom CSS for button styling
     st.markdown("""
@@ -710,7 +710,7 @@ with st.sidebar:
         </style>
     """, unsafe_allow_html=True)
     
-    st.markdown("---")
+    # st.markdown("---")
     
     # Navigation buttons
     # col1, col2 = st.columns(2)
@@ -723,7 +723,7 @@ with st.sidebar:
         st.session_state.current_view = "map"
         st.rerun()
     
-    st.markdown("---")
+    # st.markdown("---")
     
     # Show layer count
     num_layers = len(st.session_state.geodataframes)
