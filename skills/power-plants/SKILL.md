@@ -22,7 +22,7 @@ It returns the following columns:
     sector_nam — Plant-level sector
     Street_Add — Street address
     City — City
-    County — County
+    County — County. County names must be names only without "County". CORRET: County='San Diego'. Wrong: County='San Diego County'.
     State — State. State names must be FULL NAMES, not abbreviations! CORRECT: State='Ohio'. WRONG: State='OH'.
     Zip — Zip code
     PrimSource — Primary energy source
