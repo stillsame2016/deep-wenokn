@@ -145,6 +145,45 @@ where = f"PrimSource='Nuclear' AND State='California'"
 california_nuclear_plants = get_features(url, where)
 ```
 
+### Example 2: Find coal power plants in Ohio
+
+```
+import geopandas as gpd
+import requests
+
+def get_features(service_url, where_clause, bbox=None):
+    """Query ArcGIS Feature Service and return GeoDataFrame"""
+    if bbox is None:
+        bbox = [-125.0, 24.396308, -66.93457, 49.384358]  # Continental US bounds
+    
+    minx, miny, maxx, maxy = bbox
+    params = {
+        "where": where_clause,
+        "geometry": f"{minx},{miny},{maxx},{maxy}",
+        "geometryType": "esriGeometryEnvelope",
+        "spatialRel": "esriSpatialRelIntersects",
+        "outFields": "*",
+        "returnGeometry": "true",
+        "f": "geojson",
+        "outSR": "4326",  # Ensure output is in WGS84
+        "resultOffset": 0,
+        "resultRecordCount": 1000
+    }
+    
+    response = requests.get(service_url + "/query", params=params)
+    data = response.json()
+    
+    if data['features']:
+        return gpd.GeoDataFrame.from_features(data['features'])
+    else:
+        return gpd.GeoDataFrame(columns=['geometry'])
+
+# Find all coal power plants in Ohio
+url = "https://services2.arcgis.com/FiaPA4ga0iQKduv3/ArcGIS/rest/services/Power_Plants_in_the_US/FeatureServer/0"
+where = "PrimSource='Coal' AND State='Ohio'"
+coal_plants_ohio = get_features(url, where)
+```
+
 ## Notes:
 
 For the power plants at risk of flooding, use the skill assets_at_flood_risk
