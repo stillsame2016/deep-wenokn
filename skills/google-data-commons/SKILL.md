@@ -1,10 +1,9 @@
 ---
-name: google_data_commons
-description: Retrieve statistical and entity data from Google Data Commons about places, demographics, economics, health, education, climate, 
-and other societal topics. For example, population/unemployment/social vulnerability index, etc.
+name: google-data-commons
+description: Retrieve statistical and entity data from Google Data Commons about places, demographics, economics, health, education, climate, and other societal topics. For example, population/unemployment/social vulnerability index, etc.
 ---
 
-# Google_Data_Commons Skill
+# Google-Data-Commons Skill
 
 ## Description
 
