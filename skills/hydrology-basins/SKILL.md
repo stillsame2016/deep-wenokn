@@ -1,51 +1,73 @@
 ---
 name: hydrology-basins
-description: Use this skill for the requests related to the hydrology basins in USA; it provides a way to get hydrology basinss as a GeoDataframe in GeoPandas
+description: Use this skill for requests related to hydrology basins in the USA; it provides a way to get hydrology basins as a GeoDataframe in GeoPandas.
 ---
 
 # Hydrology-Basins Skill
 
 ## Description
 
-This skill gets the geometries and other attributes of hyfrology basins by accessing the ArcGIS Feature Service at the following URL:      
+This skill retrieves the geometries and attributes of hydrology basins by accessing the ArcGIS Feature Service. It queries the Watershed Boundary Dataset (HUC 6) to return data as a GeoPandas GeoDataFrame.
 
-    https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/Watershed_Boundary_Dataset_HUC_6s/FeatureServer/0
+**Data Source:**
+https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/Watershed_Boundary_Dataset_HUC_6s/FeatureServer/0
 
-It returns the following columns:
+### Output Columns
+The skill returns the following columns:
 
-objectid: A system-generated unique identifier for each basin feature.
-areaacres: The area of the basin measured in acres.
-areasqkm: The area of the basin measured in square kilometers.
-states: The U.S. states that the basin overlaps or is located within. For example, "IN,KY,OH", i.e., a concatenation of state abbreviations
-huc6: The 6-digit Hydrologic Unit Code identifying the basin at the subregion level.
-name: The official or commonly used name of the hydrologic basin.
-globalid: A globally unique identifier used to track the feature across systems.
-Shape__Area: The area of the basin geometry calculated by the GIS system.
-Shape__Length: The perimeter length of the basin geometry calculated by the GIS system.
+| Column | Description |
+| :--- | :--- |
+| **objectid** | System-generated unique identifier for the basin. |
+| **areaacres** | Area of the basin in acres. |
+| **areasqkm** | Area of the basin in square kilometers. |
+| **states** | Comma-separated list of U.S. states the basin overlaps (e.g., "IN,KY,OH"). |
+| **huc6** | The 6-digit Hydrologic Unit Code identifying the basin. |
+| **name** | The official name of the hydrologic basin. |
+| **globalid** | Globally unique identifier. |
+| **Shape__Area** | Area calculated by the GIS system. |
+| **Shape__Length** | Perimeter length calculated by the GIS system. |
 
 ## When to Use
 
-- Find a basin by a name
-- Find objects in a basin  
-- Find basins with some spatial conditions   
+- Finding a specific basin by its name.
+- Retrieving all basins that intersect a specific geographic area (Bounding Box).
+- Finding basins based on spatial conditions relative to other objects.
+
+## Parameters
+
+1.  **`where`**: (String) A SQL-style where clause to filter by attributes (e.g., `name`, `states`). Default should be `"1=1"` if no attribute filter is needed.
+2.  **`bbox`**: (List/Tuple) **Crucial for performance.** A spatial filter defined as `[minx, miny, maxx, maxy]`.
+    -   If provided, the query only returns basins intersecting this box.
+    -   If omitted, the script defaults to the entire United States, which may be slow.
 
 ## How to Use
 
-### Step 1: Construct a condition   
+### Code Example
 
-Using the condition "LOWER(name) = 'lower ohio-salt'" for finding the basin Lower Ohio-Salt 
-
-Use the following way to make a request:  
-
-```                                                  
+```python
+import requests
 import geopandas as gpd
-                   
-def get_features(self_url, where, bbox=None):
- 
+
+def get_features(url, where="1=1", bbox=None):
+    """
+    Query the Feature Service.
+    
+    Args:
+        url (str): The ArcGIS FeatureServer URL.
+        where (str): SQL filtering clause.
+        bbox (list): [min_lon, min_lat, max_lon, max_lat]. 
+                     Defaults to full US extent if None.
+    """
+    
+    # 1. Define the Bounding Box
+    # If bbox is explicitly provided, use it. 
+    # Otherwise, default to the approximate extent of the US.
     if bbox is None:                        
         bbox = [-125.0, 24.396308, -66.93457, 49.384358]   
+    
     minx, miny, maxx, maxy = bbox
            
+    # 2. Construct Query Parameters
     params = {                                
         "where": where,                       
         "geometry": f"{minx},{miny},{maxx},{maxy}", 
@@ -56,15 +78,33 @@ def get_features(self_url, where, bbox=None):
         "f": "geojson",                       
         "outSR": "4326",  # Ensure output is in WGS84  
         "resultOffset": 0,                    
-        "resultRecordCount": 1000  # Increase this if needed 
+        "resultRecordCount": 1000 
     }                                         
-    response = requests.get(self_url + "/query", params=params) 
-    data = response.json()          
-    if data['features']:                      
-        return gpd.GeoDataFrame.from_features(data['features'])  
-    else:                                               
-        return gpd.GeoDataFrame(columns=['geometry'])                                                                                                             
-url = "https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/Watershed_Boundary_Dataset_HUC_6s/FeatureServer/0"
-where = f"LOWER(name) = 'lower ohio-salt'"    
-load_features(self_url, where)                                                             
-```        
+    
+    # 3. Fetch Data
+    response = requests.get(url + "/query", params=params)
+    
+    # 4. Parse to GeoDataFrame
+    try:
+        data = response.json()          
+        if data.get('features'):                      
+            return gpd.GeoDataFrame.from_features(data['features'])  
+        else:                                               
+            return gpd.GeoDataFrame(columns=['geometry', 'name', 'huc6'])
+    except Exception as e:
+        print(f"Error fetching data: {e}")
+        return gpd.GeoDataFrame()
+
+# --- USAGE EXAMPLES ---
+
+url = "[https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/Watershed_Boundary_Dataset_HUC_6s/FeatureServer/0](https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/Watershed_Boundary_Dataset_HUC_6s/FeatureServer/0)"
+
+# Example 1: Query by Name (Attribute Filter)
+where_clause = "LOWER(name) = 'lower ohio-salt'"    
+gdf_by_name = get_features(url, where=where_clause)
+
+# Example 2: Query by BBOX (Spatial Filter)
+# This is efficient for getting all basins in a specific map view.
+# format: [min_lon, min_lat, max_lon, max_lat]
+san_diego_bbox = [-117.6, 32.5, -116.8, 33.1] 
+gdf_local = get_features(url, where="1=1", bbox=san_diego_bbox)
