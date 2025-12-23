@@ -4,6 +4,7 @@ description: Use this skill for the requests related to the power plants or buil
 ---
 
 # assets-at-flood-risk Skill
+
 ## Description
 This skill gets the geometries and other attributes of the power plants or buildings or underground storage tanks at risk of flooding at an hour from the following API endpoint:
     https://staging.api-flooding.data2action.tech/v0/impacts/structures
@@ -11,7 +12,13 @@ This skill gets the geometries and other attributes of the power plants or build
 It returns the following attributes:
 - fips: a FIPS code for each asset based on the requested level "state", "county", "tract", or "block-group".
 - feature-type: "building", or "ust" for underground storage tank, or "power" for power plant
-- date: in format YYYYMMDDHH 
+- date: in format YYYYMMDDHH
+
+## Critical Implementation Rules (Read Before Coding)
+- Response Structure: The API does not return a standard GeoJSON. All features are nested under a structures key.
+- Access Path: You must use data["structures"]["features"]. Using data["features"] will fail.
+- Geometry Construction: Do not use gpd.GeoDataFrame.from_features(). You must manually extract coordinates from feature["geometry"]["coordinates"] and create shapely.geometry.Point objects.
+- Pagination: Use the total and end index found in data["structures"]["properties"]["index"] to control the loop.
 
 ## When to Use
 - Find the buildings at risk of flooding in a region at a hour
