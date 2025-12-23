@@ -22,28 +22,18 @@ It wraps the most common workflows:
 
 ## How to Use
 
-### Step 1: Install the V2 Data Commons Client
-
-```
-    uv pip install "datacommons-client[Pandas]"
-```
-
-### Step 2: Import and Initialize the Client
+### Step 1: Import and Initialize the Client
 
 Use an **API Key** from the Data Commons portal for V2 access.
 
 ```
-    import os
-    import dotenv
-    from datacommons_client.client import DataCommonsClient                                                                                                 
-
-    dotenv.load_dotenv()
-
+    import streamlit as st
+    from datacommons_client.client import DataCommonsClient                                                                                                
     # Initialize the client with the API Key
-    client = DataCommonsClient(os.environ.get("DC_API_KEY"))
+    client = DataCommonsClient(st.secrets["DC_API_KEY"])
 ```
 
-### Step 3: Resolve one or multiple place names oto DCIDs
+### Step 2: Resolve one or multiple place names oto DCIDs
 
 #### Example: Resolve a Place Name to its DCID
 
@@ -63,7 +53,7 @@ Use an **API Key** from the Data Commons portal for V2 access.
             print(f"Resolved DCID: {san_diego_dcid}")                 
 ```
 
-### Step 4: Find Correct Variables
+### Step 3: Find Correct Variables
 
 ```
 search_results = client.observation.fetch_available_statistical_variables( 
@@ -81,7 +71,7 @@ else:
 Please note that a place like San Diego county may have more than 150000 variables. Better to filter the returned variables by some keywords and then decide which should be used in the next step. 
 
 
-### Step 5: Fetch Stats
+### Step 4: Fetch Stats
 
 The core functions for data retrieval is `observations_dataframe()`.
 
