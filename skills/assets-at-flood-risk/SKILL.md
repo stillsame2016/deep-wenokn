@@ -26,7 +26,7 @@ def fetch_flood_impacts(
     date: str, 
     fips: str = "county",  # "state" | "county" | "tract" | "block-group"
     feature_type: str = "power",  # "building" | "ust" | "power"
-    scope: Optional[Union[str, List[str]]] = None,  # State FIPS codes, default ["39", "21"]
+    scope: Optional[Union[str, List[str]]] = None,  # State FIPS codes, default ["39", "21"] for Ohio and Kentucky
     base_url: str = "https://staging.api-flooding.data2action.tech/v0/impacts/structures",
     max_retries: int = 3,
     delay_between_requests: float = 0.1
