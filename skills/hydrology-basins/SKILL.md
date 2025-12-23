@@ -103,8 +103,12 @@ url = "[https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/Waters
 where_clause = "LOWER(name) = 'lower ohio-salt'"    
 gdf_by_name = get_features(url, where=where_clause)
 
-# Example 2: Query by BBOX (Spatial Filter)
-# This is efficient for getting all basins in a specific map view.
-# format: [min_lon, min_lat, max_lon, max_lat]
-san_diego_bbox = [-117.6, 32.5, -116.8, 33.1] 
-gdf_local = get_features(url, where="1=1", bbox=san_diego_bbox)
+# Example 2: Find all basins that intersect with Ohio state
+# (Assuming 'gdf_ohio' is a GeoDataFrame containing the Ohio state boundary)
+
+# Get the bounding box of Ohio (minx, miny, maxx, maxy)
+# .total_bounds returns an array that fits the expected format
+bbox_ohio = gdf_ohio.total_bounds
+
+# Query the service using Ohio's bounding box
+gdf_basins_ohio = get_features(url, where="1=1", bbox=bbox_ohio)
