@@ -943,8 +943,8 @@ elif st.session_state.current_view == "map":
             st.markdown("### 📊 Data Tables")
             
             # Display statistics summary
-            total_rows = sum(len(df) for df in st.session_state.dataframes.values())
-            st.caption(f"{len(st.session_state.dataframes)} tables · {total_rows:,} total rows")
+            # total_rows = sum(len(df) for df in st.session_state.dataframes.values())
+            # st.caption(f"{len(st.session_state.dataframes)} tables · {total_rows:,} total rows")
             
             # Display each dataframe
             for name, df in st.session_state.dataframes.items():
