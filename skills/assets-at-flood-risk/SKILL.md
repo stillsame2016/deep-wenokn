@@ -23,11 +23,33 @@ It returns the following attributes:
 - Find the power plants at risk of flooding in a region at a hour
 - Find underground storage tanks at risk of flooding in a region at a hour
 
+## State FIPS Codes (Reference)
+
+Common state FIPS codes:
+- Ohio: `39`
+- Kentucky: `21`
+- California: `06`
+- New York: `36`
+- Texas: `48`
+- Florida: `12`
+
 ## How to Use
 
 ### Step 1: Set up the following function
 
+**IMPORTANT**: You must include these imports:
+```python
+import geopandas as gpd
+import requests
+import time
+from shapely.geometry import Point
+from typing import Optional, Union, List
 ```
+
+**CRITICAL NOTE**: The API returns data in a nested structure: `data["structures"]["features"]`.
+You MUST access features via `data["structures"]["features"]`, NOT `data["features"]`.
+
+```python
 def fetch_flood_impacts(
     date: str,
     fips: str = "county",
@@ -39,6 +61,18 @@ def fetch_flood_impacts(
 ) -> gpd.GeoDataFrame:
     """
     Fetch flood impact data from the API and return as a GeoDataFrame.
+    
+    Parameters:
+    -----------
+    date : str
+        Date in format YYYYMMDDHH (e.g., "2025071414" = July 14, 2025 at 2 PM / 14:00)
+    fips : str
+        Geographic level: "state", "county", "tract", or "block-group"
+    feature_type : str
+        Type of feature: "building", "ust", or "power"
+    scope : str or List[str]
+        State FIPS code(s). Examples: "39" (Ohio), "21" (Kentucky), ["39", "21"] (both)
+        Default is ["39", "21"] (Ohio and Kentucky)
     """
 
     # Validate parameters
@@ -118,6 +152,7 @@ def fetch_flood_impacts(
                 print(f"Invalid JSON for scope {scope_item}: {e}. Skipping.")
                 break
 
+            # CRITICAL: API returns nested structure data["structures"]["features"]
             if "structures" not in data:
                 print(f"Unexpected response format for scope {scope_item}. Skipping.")
                 break
@@ -150,7 +185,7 @@ def fetch_flood_impacts(
     # Build GeoDataFrame
     if not all_features:
         return gpd.GeoDataFrame(
-            columns=["fips", "feature-type", "geometry", "Date"],
+            columns=["fips", "feature-type", "geometry", "date"],  # Note: lowercase "date"
             geometry="geometry",
             crs="EPSG:4326"
         )
@@ -174,10 +209,44 @@ def fetch_flood_impacts(
 
 ### Step 2: Call the function fetch_flood_impacts with proper parameters
 
-For find all power plants at risk of flooding in Ohio at 2025-10-02 10:00:00 with FIPS codes at the tract level, call
+**Example 1**: Find all power plants at risk of flooding in Ohio at 2025-10-02 10:00:00 with FIPS codes at the tract level
 
-    fetch_flood_impacts("2025100210", fips="tract", feature_type="power", scope="39") 
+```python
+result = fetch_flood_impacts("2025100210", fips="tract", feature_type="power", scope="39")
+print(f"Found {len(result)} power plants at risk")
+```
 
-For find all buildinga at risk of flooding in Ohio at 2025-08-12 23:00:00 with FIPS codes at the block group level, call
+**Example 2**: Find all buildings at risk of flooding in Ohio at 2025-08-12 23:00:00 with FIPS codes at the block group level
 
-    fetch_flood_impacts("2025100210", fips="block-group", feature_type="building", scope="39") 
+```python
+result = fetch_flood_impacts("2025081223", fips="block-group", feature_type="building", scope="39")
+print(f"Found {len(result)} buildings at risk")
+```
+
+**Example 3**: Find power plants at risk in multiple states (Ohio and Kentucky) at the county level
+
+```python
+result = fetch_flood_impacts("2025070114", fips="county", feature_type="power", scope=["39", "21"])
+print(f"Found {len(result)} power plants at risk")
+```
+
+## Date Format Reference
+
+Date format is YYYYMMDDHH (10 digits):
+- `2025070114` = July 1, 2025 at 1:00 AM (01:00)
+- `2025070214` = July 2, 2025 at 2:00 PM (14:00)
+- `2025081223` = August 12, 2025 at 11:00 PM (23:00)
+- `2025123100` = December 31, 2025 at midnight (00:00)
+
+## Troubleshooting
+
+**Getting 0 results?**
+1. Verify you're using `data["structures"]["features"]` not `data["features"]`
+2. Check the date format is exactly 10 digits (YYYYMMDDHH)
+3. Verify the state FIPS code is correct (e.g., Ohio = "39")
+4. Check if flood data exists for that specific date/time
+
+**Common mistakes to avoid:**
+- ❌ Don't use `data["features"]` - the API returns `data["structures"]["features"]`
+- ❌ Don't forget to import `time` and `Point`
+- ❌ Don't use incorrect date formats (must be exactly 10 digits)
