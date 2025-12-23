@@ -672,13 +672,13 @@ async def handle_user_input_async(user_input):
 def handle_user_input(user_input):
     try:
         asyncio.run(handle_user_input_async(user_input))
-        st.rerun()
+        # st.rerun()
     except RuntimeError as e:
         if "cannot be called from a running event loop" in str(e):
             import nest_asyncio
             nest_asyncio.apply()
             asyncio.run(handle_user_input_async(user_input))
-            st.rerun()
+            # st.rerun()
         else:
             raise
 
