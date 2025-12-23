@@ -603,6 +603,25 @@ async def handle_user_input_async(user_input):
                                     accumulated_text += message.content
                                     response_placeholder.markdown(accumulated_text)
                             
+                            # if hasattr(message, 'tool_calls') and message.tool_calls:
+                            #     for tool_call in message.tool_calls:
+                            #         tool_id = tool_call.get('id')
+                            #         if tool_id and tool_id not in displayed_tool_ids:
+                            #             displayed_tool_ids.add(tool_id)
+                            #             tool_call_count += 1
+                            #             tool_name = tool_call.get('name', 'unknown')
+                            #             tool_args = tool_call.get('args', {})
+                            #             icon = TOOL_ICONS.get(tool_name, "🔧")
+                            #             display_str = format_tool_display(tool_name, tool_args)
+                                        
+                            #             with tool_calls_container:
+                            #                 st.info(f"{icon} {display_str}")
+                                        
+                            #             if tool_call_count % 5 == 0:
+                            #                 await asyncio.sleep(0.1)
+
+                            # Replace the tool display section (around line 522-535) with this enhanced version:
+
                             if hasattr(message, 'tool_calls') and message.tool_calls:
                                 for tool_call in message.tool_calls:
                                     tool_id = tool_call.get('id')
@@ -615,7 +634,39 @@ async def handle_user_input_async(user_input):
                                         display_str = format_tool_display(tool_name, tool_args)
                                         
                                         with tool_calls_container:
+                                            # Show brief summary
                                             st.info(f"{icon} {display_str}")
+                                            
+                                            # Add expandable section to show FULL arguments
+                                            with st.expander(f"🔍 Full {tool_name} details", expanded=False):
+                                                if tool_name == "shell":
+                                                    command = tool_args.get("command", "")
+                                                    st.markdown("**Full Command:**")
+                                                    st.code(command, language="bash")
+                                                    
+                                                    # If it's a Python command, try to pretty-print it
+                                                    if command.startswith("python3 -c"):
+                                                        st.markdown("**Formatted Python Code:**")
+                                                        try:
+                                                            # Extract the Python code from the command
+                                                            python_code = command.split('python3 -c "', 1)[1].rsplit('"', 1)[0]
+                                                            # Unescape and format
+                                                            python_code = python_code.replace('\\n', '\n').replace('\\"', '"')
+                                                            st.code(python_code, language="python")
+                                                        except:
+                                                            st.code(command, language="bash")
+                                                else:
+                                                    st.json(tool_args)
+                                                
+                                                # Add download button for shell commands
+                                                if tool_name == "shell" and "command" in tool_args:
+                                                    st.download_button(
+                                                        label="📥 Download Command",
+                                                        data=tool_args["command"],
+                                                        file_name=f"command_{tool_call_count}.sh",
+                                                        mime="text/plain",
+                                                        key=f"download_cmd_{tool_id}"
+                                                    )
                                         
                                         if tool_call_count % 5 == 0:
                                             await asyncio.sleep(0.1)
