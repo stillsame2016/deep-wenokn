@@ -174,7 +174,7 @@ WHERE {
 
 Because of GIS accuracy limits, you can’t reliably find dams on a river by checking direct geometric intersections. 
 A dam is stored as a point, and that point often won’t line up exactly with the river geometry. A better approach 
-is to apply a 20-meter buffer around the river and then check whether the dam point falls within that buffered area.
+is to apply a 30-meters buffer around the river and then check whether the dam point falls within that buffered area.
 
 Qlever used by FRINK doesn't support the sfBuffer function. You have to do it through geopandas. 
 
