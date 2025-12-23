@@ -27,9 +27,9 @@ It wraps the most common workflows:
 Use an **API Key** from the Data Commons portal for V2 access.
 
 ```
+    # Keep the following three lines code as they are. You are working under Streamlit Cloud. That is the eay to fetch the API token.
     import streamlit as st
-    from datacommons_client.client import DataCommonsClient                                                                                                
-    # Initialize the client with the API Key
+    from datacommons_client.client import DataCommonsClient                                                                                              
     client = DataCommonsClient(st.secrets["DC_API_KEY"])
 ```
 
