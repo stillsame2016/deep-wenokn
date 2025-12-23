@@ -106,23 +106,7 @@ def get_features(self_url, where, bbox=None):
 
 ## Examples
 
-### Example 1: Find the coal power plant 'XYZ' 
- 
-Use the following condition:
-```
-   where = f"PrimSource='Coal' AND Plant_Name='XYZ'"
-```
-
-### Example 2: Find all coal mines in Ohio
-
-Use the following code:
-```
-url = "https://services2.arcgis.com/FiaPA4ga0iQKduv3/ArcGIS/rest/services/Power_Plants_in_the_US/FeatureServer/0"
-where = f"PrimSource='Coal' AND State='Ohio'"
-ohio_coal_plants = get_features(url, where)
-```
-
-### Example 3: Find nuclear power plants in California
+### Example 1: Find nuclear power plants in California
 
 Use the following code:
 
