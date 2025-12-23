@@ -1,132 +1,102 @@
 ---
 name: assets-at-flood-risk
-description: Use this skill for the requests related to the power plants or buildings or underground storage tanks at risk of flooding at a hour as an GeoDataframe in GeoPandas.
+description: Retrieves power plants, buildings, or underground storage tanks at flood risk as a GeoDataFrame.
 ---
 
 # assets-at-flood-risk Skill
 
 ## Description
-This skill gets the geometries and other attributes of the power plants or buildings or underground storage tanks at risk of flooding at an hour from the following API endpoint:
-    https://staging.api-flooding.data2action.tech/v0/impacts/structures
-
-It returns the following attributes:
-- fips: a FIPS code for each asset based on the requested level "state", "county", "tract", or "block-group".
-- feature-type: "building", or "ust" for underground storage tank, or "power" for power plant
-- date: in format YYYYMMDDHH
-
-## Critical Implementation Rules (Read Before Coding)
-- Response Structure: The API does not return a standard GeoJSON. All features are nested under a structures key.
-- Access Path: You must use data["structures"]["features"]. Using data["features"] will fail.
-- Geometry Construction: Do not use gpd.GeoDataFrame.from_features(). You must manually extract coordinates from feature["geometry"]["coordinates"] and create shapely.geometry.Point objects.
-- Pagination: Use the total and end index found in data["structures"]["properties"]["index"] to control the loop.
-
-## When to Use
-- Find the buildings at risk of flooding in a region at a hour
-- Find the power plants at risk of flooding in a region at a hour
-- Find underground storage tanks at risk of flooding in a region at a hour
-
-## How to Use
-
-### Step 1: Set up the following function
-
+Fetches geometries and attributes of assets at flood risk from:
 ```
-def fetch_flood_impacts(
-    date: str, fips: str = "county", feature_type: str = "power", scope: Optional[Union[str, List[str]]] = None,
-    base_url: str = "https://staging.api-flooding.data2action.tech/v0/impacts/structures",
-    max_retries: int = 3, delay_between_requests: float = 0.1
-) -> gpd.GeoDataFrame:
-    """
-    Fetch flood impact data from the API and return as a GeoDataFrame.
-    """
+https://staging.api-flooding.data2action.tech/v0/impacts/structures
+```
 
-    # Validate parameters
+**Returns:** GeoDataFrame with `fips`, `feature-type`, `geometry`, and `date` (YYYYMMDDHH format).
+
+## Critical API Notes
+- Response structure: Features are under `data["structures"]["features"]`, NOT `data["features"]`
+- Must manually create Point geometries from `feature["geometry"]["coordinates"]`
+- Pagination: Use `data["structures"]["properties"]["index"]` for total/end values
+
+## Usage
+
+### Function Setup
+```python
+def fetch_flood_impacts(
+    date: str, 
+    fips: str = "county",  # "state" | "county" | "tract" | "block-group"
+    feature_type: str = "power",  # "building" | "ust" | "power"
+    scope: Optional[Union[str, List[str]]] = None,  # State FIPS codes, default ["39", "21"]
+    base_url: str = "https://staging.api-flooding.data2action.tech/v0/impacts/structures",
+    max_retries: int = 3,
+    delay_between_requests: float = 0.1
+) -> gpd.GeoDataFrame:
+    """Fetch flood impact data and return as GeoDataFrame."""
+    
+    # Validate inputs
     valid_fips = ["state", "county", "tract", "block-group"]
     valid_feature_types = ["building", "ust", "power"]
     
-    if fips not in valid_fips:
-        raise ValueError(f"fips must be one of {valid_fips}")
+    if fips not in valid_fips or feature_type not in valid_feature_types:
+        raise ValueError(f"Invalid parameters")
+    if len(date) != 10 or not date.isdigit():
+        raise ValueError("date format: YYYYMMDDHH")
     
-    if feature_type not in valid_feature_types:
-        raise ValueError(f"feature_type must be one of {valid_feature_types}")
-    
-    # Default to Ohio and Kentucky
-    if scope is None:
-        scope = ["39", "21"]
+    scope = scope or ["39", "21"]
     if isinstance(scope, str):
         scope = [scope]
     
-    if len(date) != 10 or not date.isdigit():
-        raise ValueError("date must be in format YYYYMMDDHH (e.g., '2025071414')")
-    
     all_features = []
 
-    print(f"Fetching {feature_type} data for {fips} level on {date} in scope {scope}...")
-
-    # Process each scope
     for scope_item in scope:
-        print(f"Processing scope: {scope_item}")
         page = 0
-
         while True:
-            params = { "date": date, "fips": fips, "feature-type": feature_type, "scope": scope_item, "response-format": "geojson", "page": page, "size": 1000}
-            headers = { "x-api-key": "maj6OM1L77141VXiH7GMy1iLRWmFI88M5JVLMHn7"}
+            params = {
+                "date": date, "fips": fips, "feature-type": feature_type,
+                "scope": scope_item, "response-format": "geojson",
+                "page": page, "size": 1000
+            }
+            headers = {"x-api-key": "maj6OM1L77141VXiH7GMy1iLRWmFI88M5JVLMHn7"}
 
-            # Retry request block
+            # Retry logic
             response = None
             for attempt in range(max_retries):
                 try:
                     response = requests.get(base_url, params=params, headers=headers, timeout=30)
-
-                    # If API says "no data" → skip but do not fail
                     if response.status_code == 404:
-                        print(f"No data for scope {scope_item} on {date} (404). Skipping.")
                         response = None
                         break
-
                     response.raise_for_status()
-                    break  # success
-
-                except requests.RequestException as e:
+                    break
+                except requests.RequestException:
                     if attempt == max_retries - 1:
-                        print(f"Scope {scope_item} failed after {max_retries} attempts: {e}. Skipping this scope.")
                         response = None
-                    else:
-                        print(f"Attempt {attempt + 1} failed for scope {scope_item}, retrying...")
-                        time.sleep(delay_between_requests * (2 ** attempt))
+                    time.sleep(delay_between_requests * (2 ** attempt))
 
-            # If request failed after all retries → skip this scope
-            if response is None:
+            if not response:
                 break
 
-            # Parse JSON
             try:
                 data = response.json()
-            except ValueError as e:
-                print(f"Invalid JSON for scope {scope_item}: {e}. Skipping.")
+            except ValueError:
                 break
 
-            # Very Important: Must keep the following as it is. Don't make any changes
+            # CRITICAL: Access structures key
             if "structures" not in data:
-                print(f"Unexpected response format for scope {scope_item}. Skipping.")
                 break
 
-            # Very Important: Must keep the following as it it. Don't make any changes.
             structures = data["structures"]
             features = structures.get("features", [])
-
-            # No more data for this scope
+            
             if not features:
                 break
 
             all_features.extend(features)
 
-            # Pagination
+            # Check pagination
             props = structures.get("properties", {})
-            index_info = props.get("index", {})
             total = props.get("total", 0)
-            end_index = index_info.get("end", 0)
-
-            print(f"Scope {scope_item}, Page {page}: Retrieved {len(features)} features (total so far: {len(all_features)})")
+            end_index = props.get("index", {}).get("end", 0)
 
             if end_index >= total or len(features) < 1000:
                 break
@@ -134,21 +104,17 @@ def fetch_flood_impacts(
             page += 1
             time.sleep(delay_between_requests)
 
-    print(f"Completed: Retrieved {len(all_features)} total features")
-
     # Build GeoDataFrame
     if not all_features:
         return gpd.GeoDataFrame(
-            columns=["fips", "feature-type", "geometry", "Date"],
-            geometry="geometry",
-            crs="EPSG:4326"
+            columns=["fips", "feature-type", "geometry", "date"],
+            geometry="geometry", crs="EPSG:4326"
         )
 
     rows = []
     for feature in all_features:
         props = feature["properties"]
         lon, lat = feature["geometry"]["coordinates"]
-
         rows.append({
             "fips": props["fips"],
             "feature-type": props["feature-type"],
@@ -157,20 +123,14 @@ def fetch_flood_impacts(
 
     gdf = gpd.GeoDataFrame(rows, crs="EPSG:4326")
     gdf["date"] = date
-
     return gdf
 ```
 
-### Step 2: Call the function fetch_flood_impacts with proper parameters
+### Examples
+```python
+# Power plants at risk in Ohio on 2025-10-02 10:00, tract level
+fetch_flood_impacts("2025100210", fips="tract", feature_type="power", scope="39")
 
-For find all power plants at risk of flooding in Ohio at 2025-10-02 10:00:00 with FIPS codes at the tract level, call
+# Buildings at risk in Ohio on 2025-08-12 23:00, block group level
+fetch_flood_impacts("2025081223", fips="block-group", feature_type="building", scope="39")
 ```
-    fetch_flood_impacts("2025100210", fips="tract", feature_type="power", scope="39") 
-```
-
-For find all buildinga at risk of flooding in Ohio at 2025-08-12 23:00:00 with FIPS codes at the block group level, call
-```
-    fetch_flood_impacts("2025100210", fips="block-group", feature_type="building", scope="39") 
-```
-
-
