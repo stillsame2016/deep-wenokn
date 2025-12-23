@@ -620,21 +620,57 @@ async def handle_user_input_async(user_input):
                                         if tool_call_count % 5 == 0:
                                             await asyncio.sleep(0.1)
                         
+                        # elif isinstance(message, ToolMessage):
+                        #     tool_name = getattr(message, "name", "")
+                        #     tool_content = getattr(message, "content", "")
+
+                        #     # ADD THIS DEBUG OUTPUT
+                        #     with tool_calls_container:
+                        #         with st.expander(f"🔍 {tool_name} output", expanded=False):
+                        #             st.code(tool_content[:1000])  # Show first 1000 chars
+                            
+                        #     if isinstance(tool_content, str) and (
+                        #         tool_content.lower().startswith("error") or
+                        #         "failed" in tool_content.lower()
+                        #     ):
+                        #         with tool_calls_container:
+                        #             st.error(f"❌ {tool_name}: {tool_content}")
+
                         elif isinstance(message, ToolMessage):
                             tool_name = getattr(message, "name", "")
                             tool_content = getattr(message, "content", "")
-
-                            # ADD THIS DEBUG OUTPUT
+                        
+                            # Enhanced debug output with full content and better formatting
                             with tool_calls_container:
-                                with st.expander(f"🔍 {tool_name} output", expanded=False):
-                                    st.code(tool_content[:1000])  # Show first 1000 chars
+                                # Show a preview with character count
+                                preview_length = 500
+                                is_truncated = len(tool_content) > preview_length
+                                
+                                expander_title = f"🔍 {tool_name} output ({len(tool_content)} chars)"
+                                if is_truncated:
+                                    expander_title += " - Click to see full output"
+                                
+                                with st.expander(expander_title, expanded=False):
+                                    # Show full content without truncation
+                                    st.code(tool_content, language="python" if "import" in tool_content[:100] else "text")
+                                    
+                                    # Add download button for long outputs
+                                    if len(tool_content) > 1000:
+                                        st.download_button(
+                                            label="📥 Download Full Output",
+                                            data=tool_content,
+                                            file_name=f"{tool_name}_output.txt",
+                                            mime="text/plain",
+                                            key=f"download_{tool_name}_{hash(tool_content)}"
+                                        )
                             
+                            # Keep the error detection
                             if isinstance(tool_content, str) and (
                                 tool_content.lower().startswith("error") or
                                 "failed" in tool_content.lower()
                             ):
                                 with tool_calls_container:
-                                    st.error(f"❌ {tool_name}: {tool_content}")
+                                    st.error(f"❌ {tool_name}: {tool_content}") 
             
             except Exception as stream_error:
                 st.warning("⚠️ Streaming failed, trying direct invocation...")
