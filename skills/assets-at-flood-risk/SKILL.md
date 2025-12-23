@@ -33,23 +33,32 @@ Common state FIPS codes:
 - Texas: `48`
 - Florida: `12`
 
+## CRITICAL INSTRUCTIONS - DO NOT MODIFY THE CODE
+
+**⚠️ WARNING: This code MUST be copied EXACTLY as written. Do NOT:**
+- Remove pagination logic (page, size parameters)
+- Remove API key from headers
+- Simplify the retry logic
+- Change the response parsing structure
+- Remove any parameters from the request
+
+**The API requires:**
+1. ✅ `x-api-key` header (MANDATORY)
+2. ✅ Pagination with `page` and `size` parameters
+3. ✅ `response-format: geojson` parameter
+4. ✅ Access to `data["structures"]["features"]` (nested structure)
+
 ## How to Use
 
-### Step 1: Set up the following function
+### Step 1: Copy this EXACT function (DO NOT MODIFY)
 
-**IMPORTANT**: You must include these imports:
 ```python
 import geopandas as gpd
 import requests
 import time
 from shapely.geometry import Point
 from typing import Optional, Union, List
-```
 
-**CRITICAL NOTE**: The API returns data in a nested structure: `data["structures"]["features"]`.
-You MUST access features via `data["structures"]["features"]`, NOT `data["features"]`.
-
-```python
 def fetch_flood_impacts(
     date: str,
     fips: str = "county",
@@ -61,6 +70,8 @@ def fetch_flood_impacts(
 ) -> gpd.GeoDataFrame:
     """
     Fetch flood impact data from the API and return as a GeoDataFrame.
+    
+    ⚠️ DO NOT MODIFY THIS FUNCTION - Copy it exactly as written
     
     Parameters:
     -----------
@@ -104,16 +115,18 @@ def fetch_flood_impacts(
         page = 0
 
         while True:
+            # CRITICAL: These parameters are REQUIRED - do not remove any
             params = {
                 "date": date,
                 "fips": fips,
                 "feature-type": feature_type,
                 "scope": scope_item,
-                "response-format": "geojson",
-                "page": page,
-                "size": 1000
+                "response-format": "geojson",  # REQUIRED
+                "page": page,                   # REQUIRED for pagination
+                "size": 1000                    # REQUIRED for pagination
             }
 
+            # CRITICAL: API key header is MANDATORY
             headers = {
                 "x-api-key": "maj6OM1L77141VXiH7GMy1iLRWmFI88M5JVLMHn7"
             }
@@ -122,6 +135,7 @@ def fetch_flood_impacts(
             response = None
             for attempt in range(max_retries):
                 try:
+                    # CRITICAL: Must include headers parameter
                     response = requests.get(base_url, params=params, headers=headers, timeout=30)
 
                     # If API says "no data" → skip but do not fail
@@ -153,6 +167,7 @@ def fetch_flood_impacts(
                 break
 
             # CRITICAL: API returns nested structure data["structures"]["features"]
+            # DO NOT change this to data["features"]
             if "structures" not in data:
                 print(f"Unexpected response format for scope {scope_item}. Skipping.")
                 break
@@ -166,7 +181,7 @@ def fetch_flood_impacts(
 
             all_features.extend(features)
 
-            # Pagination
+            # CRITICAL: Pagination logic - DO NOT REMOVE
             props = structures.get("properties", {})
             index_info = props.get("index", {})
             total = props.get("total", 0)
@@ -185,7 +200,7 @@ def fetch_flood_impacts(
     # Build GeoDataFrame
     if not all_features:
         return gpd.GeoDataFrame(
-            columns=["fips", "feature-type", "geometry", "date"],  # Note: lowercase "date"
+            columns=["fips", "feature-type", "geometry", "date"],
             geometry="geometry",
             crs="EPSG:4326"
         )
@@ -207,46 +222,72 @@ def fetch_flood_impacts(
     return gdf
 ```
 
-### Step 2: Call the function fetch_flood_impacts with proper parameters
+### Step 2: Call the function with proper parameters
 
-**Example 1**: Find all power plants at risk of flooding in Ohio at 2025-10-02 10:00:00 with FIPS codes at the tract level
+**Example 1**: Power plants at risk in Ohio at 2 PM on July 1, 2025 (tract level)
 
 ```python
-result = fetch_flood_impacts("2025100210", fips="tract", feature_type="power", scope="39")
-print(f"Found {len(result)} power plants at risk")
+# Date format: YYYYMMDDHH
+# July 1, 2025 at 14:00 (2 PM) = "2025070114"
+result = fetch_flood_impacts(
+    date="2025070114",
+    fips="tract",
+    feature_type="power",
+    scope="39"  # Ohio
+)
+
+if len(result) > 0:
+    result.to_file("/tmp/output.geojson", driver="GeoJSON")
+    print(f"Saved {len(result)} power plants")
 ```
 
-**Example 2**: Find all buildings at risk of flooding in Ohio at 2025-08-12 23:00:00 with FIPS codes at the block group level
+**Example 2**: Buildings at risk in Ohio at 11 PM on Aug 12, 2025 (block-group level)
 
 ```python
-result = fetch_flood_impacts("2025081223", fips="block-group", feature_type="building", scope="39")
-print(f"Found {len(result)} buildings at risk")
+# August 12, 2025 at 23:00 (11 PM) = "2025081223"
+result = fetch_flood_impacts(
+    date="2025081223",
+    fips="block-group",
+    feature_type="building",
+    scope="39"  # Ohio
+)
+
+if len(result) > 0:
+    result.to_file("/tmp/output.geojson", driver="GeoJSON")
+    print(f"Saved {len(result)} buildings")
 ```
 
-**Example 3**: Find power plants at risk in multiple states (Ohio and Kentucky) at the county level
+**Example 3**: Power plants in multiple states (Ohio and Kentucky)
 
 ```python
-result = fetch_flood_impacts("2025070114", fips="county", feature_type="power", scope=["39", "21"])
-print(f"Found {len(result)} power plants at risk")
+result = fetch_flood_impacts(
+    date="2025070114",
+    fips="county",
+    feature_type="power",
+    scope=["39", "21"]  # Ohio and Kentucky
+)
 ```
 
 ## Date Format Reference
 
-Date format is YYYYMMDDHH (10 digits):
-- `2025070114` = July 1, 2025 at 1:00 AM (01:00)
-- `2025070214` = July 2, 2025 at 2:00 PM (14:00)
-- `2025081223` = August 12, 2025 at 11:00 PM (23:00)
-- `2025123100` = December 31, 2025 at midnight (00:00)
+Format: YYYYMMDDHH (10 digits, 24-hour time)
+- `2025070114` = July 1, 2025 at 14:00 (2 PM)
+- `2025070101` = July 1, 2025 at 01:00 (1 AM)
+- `2025081223` = August 12, 2025 at 23:00 (11 PM)
+- `2025123100` = December 31, 2025 at 00:00 (midnight)
 
-## Troubleshooting
+## Common Errors to Avoid
 
-**Getting 0 results?**
-1. Verify you're using `data["structures"]["features"]` not `data["features"]`
-2. Check the date format is exactly 10 digits (YYYYMMDDHH)
-3. Verify the state FIPS code is correct (e.g., Ohio = "39")
-4. Check if flood data exists for that specific date/time
+❌ **DO NOT do these things:**
+1. Remove the `headers` parameter with API key
+2. Remove `page` and `size` from params
+3. Change `data["structures"]["features"]` to `data["features"]`
+4. Simplify the pagination logic
+5. Remove the retry logic
+6. Use `gpd.GeoDataFrame.from_features()` instead of manual construction
 
-**Common mistakes to avoid:**
-- ❌ Don't use `data["features"]` - the API returns `data["structures"]["features"]`
-- ❌ Don't forget to import `time` and `Point`
-- ❌ Don't use incorrect date formats (must be exactly 10 digits)
+✅ **Always:**
+1. Copy the function exactly as written
+2. Only change the parameters in Step 2 when calling the function
+3. Include all imports at the top
+4. Use the correct date format (YYYYMMDDHH)
