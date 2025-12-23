@@ -1,6 +1,6 @@
 ---
 name: hydrology-basins
-description: Use this skill for requests related to hydrology basins in the USA. It provides a way to retrieve hydrology basins as a GeoDataFrame in GeoPandas by querying an ArcGIS Feature Service.
+description: Use this skill for requests to retrieve hydrology basins in the USA as a GeoDataFrame in GeoPandas. Note that this skill is able to fetch all basins intersecting some states directly.
 ---
 
 # Hydrology-Basins Skill
