@@ -868,65 +868,153 @@ if st.session_state.current_view == "conversation":
         handle_user_input(user_input)
 
 elif st.session_state.current_view == "map":
-    # Map View
-    # st.markdown("### 🗺️ Geographic Data Layers")
     
-    if not st.session_state.geodataframes:
-        st.info("No map layers yet. Start a conversation to generate geographic data!")
+    # Check if we have any data at all
+    has_geodata = len(st.session_state.geodataframes) > 0
+    has_tabledata = len(st.session_state.dataframes) > 0
+    
+    if not has_geodata and not has_tabledata:
+        st.info("No data yet. Start a conversation to generate maps and data tables!")
     else:
+        # ========== MAP SECTION ==========
         # Display the combined map
-        display_all_layers_map()
+        if has_geodata:
+            display_all_layers_map()
         
-        st.markdown("---")
-        st.markdown("### 📊 Layer Management")
+            st.markdown("---")
+            st.markdown("### 📊 Layer Management")
+            
+            # Layer controls
+            for name, gdf in st.session_state.geodataframes.items():
+                with st.expander(f"🗺️ {name.replace('_', ' ').title()} ({len(gdf)} features)"):
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        # Download GeoJSON
+                        # geojson_str = gdf.to_json()
+    
+                        # Download GeoJSON - convert datetime columns to strings first
+                        gdf_copy = gdf.copy()
+                        # Convert all datetime/timestamp columns to ISO format strings
+                        for col in gdf_copy.columns:
+                            if pd.api.types.is_datetime64_any_dtype(gdf_copy[col]):
+                                gdf_copy[col] = gdf_copy[col].astype(str)
+                        
+                        geojson_str = gdf_copy.to_json()
+                        
+                        st.download_button(
+                            label="📥 GeoJSON",
+                            data=geojson_str,
+                            file_name=f"{name}.geojson",
+                            mime="application/json",
+                            key=f"download_geojson_{name}",
+                            use_container_width=True
+                        )
+                    
+                    with col2:
+                        # Download CSV (exclude geometry columns)
+                        csv_df = gdf.drop(columns=[col for col in gdf.columns if col.lower() in ['geometry', 'geom', 'the_geom', 'shape']], errors='ignore')
+                        csv_str = csv_df.to_csv(index=False)
+                        st.download_button(
+                            label="📥 CSV",
+                            data=csv_str,
+                            file_name=f"{name}.csv",
+                            mime="text/csv",
+                            key=f"download_csv_{name}",
+                            use_container_width=True
+                        )
+                    
+                    with col3:
+                        # Delete layer
+                        if st.button("🗑️ Delete", key=f"delete_{name}", use_container_width=True):
+                            del st.session_state.geodataframes[name]
+                            st.rerun()
+                    
+                    # Show attribute table (exclude geometry columns)
+                    st.markdown("**Attributes:**")
+                    display_df = gdf.drop(columns=[col for col in gdf.columns if col.lower() in ['geometry', 'geom', 'the_geom', 'shape']], errors='ignore')
+                    st.dataframe(display_df, use_container_width=True, height=200)
         
-        # Layer controls
-        for name, gdf in st.session_state.geodataframes.items():
-            with st.expander(f"🗺️ {name.replace('_', ' ').title()} ({len(gdf)} features)"):
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    # Download GeoJSON
-                    # geojson_str = gdf.to_json()
-
-                    # Download GeoJSON - convert datetime columns to strings first
-                    gdf_copy = gdf.copy()
-                    # Convert all datetime/timestamp columns to ISO format strings
-                    for col in gdf_copy.columns:
-                        if pd.api.types.is_datetime64_any_dtype(gdf_copy[col]):
-                            gdf_copy[col] = gdf_copy[col].astype(str)
+        # ========== DATA TABLES SECTION ==========
+        if has_tabledata:
+            if has_geodata:
+                st.markdown("---")  # Separator between map and tables
+            
+            st.markdown("### 📊 Data Tables")
+            
+            # Display statistics summary
+            total_rows = sum(len(df) for df in st.session_state.dataframes.values())
+            st.caption(f"{len(st.session_state.dataframes)} tables · {total_rows:,} total rows")
+            
+            # Display each dataframe
+            for name, df in st.session_state.dataframes.items():
+                with st.expander(f"📋 {name.replace('_', ' ').title()} ({len(df)} rows × {len(df.columns)} columns)", expanded=True):
+                    col1, col2, col3 = st.columns(3)
                     
-                    geojson_str = gdf_copy.to_json()
+                    with col1:
+                        # Download CSV
+                        csv_str = df.to_csv(index=False)
+                        st.download_button(
+                            label="📥 CSV",
+                            data=csv_str,
+                            file_name=f"{name}.csv",
+                            mime="text/csv",
+                            key=f"download_table_{name}",
+                            use_container_width=True
+                        )
                     
-                    st.download_button(
-                        label="📥 GeoJSON",
-                        data=geojson_str,
-                        file_name=f"{name}.geojson",
-                        mime="application/json",
-                        key=f"download_geojson_{name}",
-                        use_container_width=True
+                    with col2:
+                        # Download Excel
+                        try:
+                            import io
+                            buffer = io.BytesIO()
+                            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                                df.to_excel(writer, index=False, sheet_name=name[:31])  # Excel sheet name limit
+                            st.download_button(
+                                label="📥 Excel",
+                                data=buffer.getvalue(),
+                                file_name=f"{name}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key=f"download_excel_{name}",
+                                use_container_width=True
+                            )
+                        except ImportError:
+                            st.caption("(openpyxl not installed)")
+                    
+                    with col3:
+                        # Delete table
+                        if st.button("🗑️ Delete", key=f"delete_table_{name}", use_container_width=True):
+                            del st.session_state.dataframes[name]
+                            st.rerun()
+                    
+                    # Show basic statistics
+                    st.markdown("**Quick Stats:**")
+                    stat_cols = st.columns(4)
+                    with stat_cols[0]:
+                        st.metric("Rows", f"{len(df):,}")
+                    with stat_cols[1]:
+                        st.metric("Columns", len(df.columns))
+                    with stat_cols[2]:
+                        numeric_cols = df.select_dtypes(include=['number']).columns
+                        st.metric("Numeric", len(numeric_cols))
+                    with stat_cols[3]:
+                        missing = df.isnull().sum().sum()
+                        st.metric("Missing", f"{missing:,}")
+                    
+                    # Display the dataframe with formatting
+                    st.markdown("**Data Preview:**")
+                    st.dataframe(
+                        df,
+                        use_container_width=True,
+                        height=min(400, len(df) * 35 + 38)  # Dynamic height based on rows
                     )
-                
-                with col2:
-                    # Download CSV (exclude geometry columns)
-                    csv_df = gdf.drop(columns=[col for col in gdf.columns if col.lower() in ['geometry', 'geom', 'the_geom', 'shape']], errors='ignore')
-                    csv_str = csv_df.to_csv(index=False)
-                    st.download_button(
-                        label="📥 CSV",
-                        data=csv_str,
-                        file_name=f"{name}.csv",
-                        mime="text/csv",
-                        key=f"download_csv_{name}",
-                        use_container_width=True
-                    )
-                
-                with col3:
-                    # Delete layer
-                    if st.button("🗑️ Delete", key=f"delete_{name}", use_container_width=True):
-                        del st.session_state.geodataframes[name]
-                        st.rerun()
-                
-                # Show attribute table (exclude geometry columns)
-                st.markdown("**Attributes:**")
-                display_df = gdf.drop(columns=[col for col in gdf.columns if col.lower() in ['geometry', 'geom', 'the_geom', 'shape']], errors='ignore')
-                st.dataframe(display_df, use_container_width=True, height=200)
+                    
+                    # Optional: Show column types
+                    with st.expander("📋 Column Info"):
+                        col_info = pd.DataFrame({
+                            'Column': df.columns,
+                            'Type': df.dtypes.astype(str),
+                            'Non-Null': df.notna().sum(),
+                            'Null': df.isna().sum()
+                        })
+                        st.dataframe(col_info, use_container_width=True, hide_index=True)
