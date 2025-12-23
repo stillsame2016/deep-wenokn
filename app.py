@@ -858,7 +858,17 @@ elif st.session_state.current_view == "map":
                 
                 with col1:
                     # Download GeoJSON
-                    geojson_str = gdf.to_json()
+                    # geojson_str = gdf.to_json()
+
+                    # Download GeoJSON - convert datetime columns to strings first
+                    gdf_copy = gdf.copy()
+                    # Convert all datetime/timestamp columns to ISO format strings
+                    for col in gdf_copy.columns:
+                        if pd.api.types.is_datetime64_any_dtype(gdf_copy[col]):
+                            gdf_copy[col] = gdf_copy[col].astype(str)
+                    
+                    geojson_str = gdf_copy.to_json()
+                    
                     st.download_button(
                         label="📥 GeoJSON",
                         data=geojson_str,
