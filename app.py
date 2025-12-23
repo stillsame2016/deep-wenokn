@@ -197,6 +197,30 @@ def display_all_layers_map():
             '#1F77B4', '#FF7F0E', '#2CA02C', '#D62728', '#9467BD', 
             '#8C564B', '#E377C2', '#7F7F7F', '#BCBD22', '#17BECF'
         ]
+
+        colors = [
+            "#1F3A5F",  # deep blue
+            "#C0392B",  # strong red
+            "#2E8B57",  # sea green
+            "#F39C12",  # amber
+            "#6C3483",  # deep purple
+            "#16A085",  # teal
+            "#7D6608",  # olive
+            "#922B21",  # dark brick
+            "#1B4F72",  # steel blue
+            "#784212",  # brown
+        
+            "#2874A6",  # blue
+            "#AF601A",  # burnt orange
+            "#1E8449",  # green
+            "#B03A2E",  # red
+            "#5B2C6F",  # purple
+            "#117864",  # dark teal
+            "#9A7D0A",  # mustard
+            "#512E5F",  # plum
+            "#4D5656",  # dark gray
+            "#0E6251",  # blue-green
+        ]
         
         # Add each geodataframe as a layer
         for idx, (name, gdf) in enumerate(st.session_state.geodataframes.items()):
