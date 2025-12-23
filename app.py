@@ -835,7 +835,7 @@ with st.sidebar:
         st.session_state.current_view = "conversation"
         st.rerun()
     # with col2:
-    if st.button("Map", use_container_width=True, type="primary" if st.session_state.current_view == "map" else "secondary"):
+    if st.button("Map & Data", use_container_width=True, type="primary" if st.session_state.current_view == "map" else "secondary"):
         st.session_state.current_view = "map"
         st.rerun()
     
