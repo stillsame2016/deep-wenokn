@@ -118,12 +118,12 @@ def fetch_flood_impacts(
                 print(f"Invalid JSON for scope {scope_item}: {e}. Skipping.")
                 break
 
-            # Must check the following
+            # Must keep the following as it is. Don't make any changes
             if "structures" not in data:
                 print(f"Unexpected response format for scope {scope_item}. Skipping.")
                 break
 
-            # Must use the following to extract features
+            # Must keep the following as it it. Don't make any changes.
             structures = data["structures"]
             features = structures.get("features", [])
 
