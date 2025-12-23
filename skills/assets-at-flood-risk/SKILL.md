@@ -181,3 +181,23 @@ For find all power plants at risk of flooding in Ohio at 2025-10-02 10:00:00 wit
 For find all buildinga at risk of flooding in Ohio at 2025-08-12 23:00:00 with FIPS codes at the block group level, call
 
     fetch_flood_impacts("2025100210", fips="block-group", feature_type="building", scope="39") 
+
+## Notes:
+
+Must use the following code to get features from the API return:
+
+```
+data = response.json()
+if "structures" not in data:
+    print(f"Unexpected response format for scope {scope_item}. Skipping.")
+    break
+structures = data["structures"]
+features = structures.get("features", [])
+```
+
+It is wrong to use the following:
+```
+data = response.json()
+if 'features' not in data or len(data['features']) == 0:
+```
+
