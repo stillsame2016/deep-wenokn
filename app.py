@@ -987,19 +987,19 @@ elif st.session_state.current_view == "map":
                             del st.session_state.dataframes[name]
                             st.rerun()
                     
-                    # Show basic statistics
-                    st.markdown("**Quick Stats:**")
-                    stat_cols = st.columns(4)
-                    with stat_cols[0]:
-                        st.metric("Rows", f"{len(df):,}")
-                    with stat_cols[1]:
-                        st.metric("Columns", len(df.columns))
-                    with stat_cols[2]:
-                        numeric_cols = df.select_dtypes(include=['number']).columns
-                        st.metric("Numeric", len(numeric_cols))
-                    with stat_cols[3]:
-                        missing = df.isnull().sum().sum()
-                        st.metric("Missing", f"{missing:,}")
+                    # # Show basic statistics
+                    # st.markdown("**Quick Stats:**")
+                    # stat_cols = st.columns(4)
+                    # with stat_cols[0]:
+                    #     st.metric("Rows", f"{len(df):,}")
+                    # with stat_cols[1]:
+                    #     st.metric("Columns", len(df.columns))
+                    # with stat_cols[2]:
+                    #     numeric_cols = df.select_dtypes(include=['number']).columns
+                    #     st.metric("Numeric", len(numeric_cols))
+                    # with stat_cols[3]:
+                    #     missing = df.isnull().sum().sum()
+                    #     st.metric("Missing", f"{missing:,}")
                     
                     # Display the dataframe with formatting
                     st.markdown("**Data Preview:**")
@@ -1010,11 +1010,11 @@ elif st.session_state.current_view == "map":
                     )
                     
                     # Optional: Show column types
-                    with st.expander("📋 Column Info"):
-                        col_info = pd.DataFrame({
-                            'Column': df.columns,
-                            'Type': df.dtypes.astype(str),
-                            'Non-Null': df.notna().sum(),
-                            'Null': df.isna().sum()
-                        })
-                        st.dataframe(col_info, use_container_width=True, hide_index=True)
+                    # with st.expander("📋 Column Info"):
+                    #     col_info = pd.DataFrame({
+                    #         'Column': df.columns,
+                    #         'Type': df.dtypes.astype(str),
+                    #         'Non-Null': df.notna().sum(),
+                    #         'Null': df.isna().sum()
+                    #     })
+                    #     st.dataframe(col_info, use_container_width=True, hide_index=True)
