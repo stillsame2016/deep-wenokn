@@ -948,7 +948,7 @@ elif st.session_state.current_view == "map":
             
             # Display each dataframe
             for name, df in st.session_state.dataframes.items():
-                with st.expander(f"📋 {name.replace('_', ' ').title()} ({len(df)} rows × {len(df.columns)} columns)", expanded=True):
+                with st.expander(f"📋 {name.replace('_', ' ').title()} ({len(df)} rows × {len(df.columns)} columns)", expanded=False):
                     col1, col2, col3 = st.columns(3)
                     
                     with col1:
