@@ -4,21 +4,16 @@ description: Use this skill for the requests related to the power plants or buil
 ---
 
 # assets-at-flood-risk Skill
-
 ## Description
-
 This skill gets the geometries and other attributes of the power plants or buildings or underground storage tanks at risk of flooding at an hour from the following API endpoint:
-
     https://staging.api-flooding.data2action.tech/v0/impacts/structures
 
 It returns the following attributes:
-
 - fips: a FIPS code for each asset based on the requested level "state", "county", "tract", or "block-group".
 - feature-type: "building", or "ust" for underground storage tank, or "power" for power plant
 - date: in format YYYYMMDDHH 
 
 ## When to Use
-
 - Find the buildings at risk of flooding in a region at a hour
 - Find the power plants at risk of flooding in a region at a hour
 - Find underground storage tanks at risk of flooding in a region at a hour
@@ -29,13 +24,9 @@ It returns the following attributes:
 
 ```
 def fetch_flood_impacts(
-    date: str,
-    fips: str = "county",
-    feature_type: str = "power",
-    scope: Optional[Union[str, List[str]]] = None,
+    date: str, fips: str = "county", feature_type: str = "power", scope: Optional[Union[str, List[str]]] = None,
     base_url: str = "https://staging.api-flooding.data2action.tech/v0/impacts/structures",
-    max_retries: int = 3,
-    delay_between_requests: float = 0.1
+    max_retries: int = 3, delay_between_requests: float = 0.1
 ) -> gpd.GeoDataFrame:
     """
     Fetch flood impact data from the API and return as a GeoDataFrame.
@@ -70,19 +61,8 @@ def fetch_flood_impacts(
         page = 0
 
         while True:
-            params = {
-                "date": date,
-                "fips": fips,
-                "feature-type": feature_type,
-                "scope": scope_item,
-                "response-format": "geojson",
-                "page": page,
-                "size": 1000
-            }
-
-            headers = {
-                "x-api-key": "maj6OM1L77141VXiH7GMy1iLRWmFI88M5JVLMHn7"
-            }
+            params = { "date": date, "fips": fips, "feature-type": feature_type, "scope": scope_item, "response-format": "geojson", "page": page, "size": 1000}
+            headers = { "x-api-key": "maj6OM1L77141VXiH7GMy1iLRWmFI88M5JVLMHn7"}
 
             # Retry request block
             response = None
@@ -118,12 +98,12 @@ def fetch_flood_impacts(
                 print(f"Invalid JSON for scope {scope_item}: {e}. Skipping.")
                 break
 
-            # Must keep the following as it is. Don't make any changes
+            # Very Important: Must keep the following as it is. Don't make any changes
             if "structures" not in data:
                 print(f"Unexpected response format for scope {scope_item}. Skipping.")
                 break
 
-            # Must keep the following as it it. Don't make any changes.
+            # Very Important: Must keep the following as it it. Don't make any changes.
             structures = data["structures"]
             features = structures.get("features", [])
 
