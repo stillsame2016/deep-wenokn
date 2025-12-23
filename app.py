@@ -61,22 +61,15 @@ if "temp_dir" not in st.session_state:
 if "current_view" not in st.session_state:
     st.session_state.current_view = "conversation"  # "conversation" or "map"
 
-# current_dir = os.getcwd()
-# for root, dirs, files in os.walk(current_dir):
-#     for file in files:
-#         # Join the root path and filename to get the full path
-#         full_path = os.path.join(root, file)
-#         st.markdown(full_path)
-
-# current_dir = st.session_state.temp_dir
-# st.markdown(f"==================== {current_dir}")
-# for root, dirs, files in os.walk(current_dir):
-#     for file in files:
-#         # Join the root path and filename to get the full path
-#         full_path = os.path.join(root, file)
-#         st.markdown(full_path)
-
-
+# NEW: Map state persistence
+if "map_center" not in st.session_state:
+    st.session_state.map_center = [39.8, -98.6]  # Default center of US
+if "map_zoom" not in st.session_state:
+    st.session_state.map_zoom = 6
+if "map_bounds" not in st.session_state:
+    st.session_state.map_bounds = None
+if "layer_visibility" not in st.session_state:
+    st.session_state.layer_visibility = {}  # Dict: {layer_name: True/False}
 
 # Helper function to scan and cache skills documentation
 def scan_skills_documentation():
@@ -139,23 +132,21 @@ def display_all_layers_map():
                 gdf = gdf.to_crs(epsg=4326)
             all_bounds.append(gdf.total_bounds)
         
-        # Calculate center
-        if all_bounds:
+        # Use stored center/zoom or calculate from bounds
+        if st.session_state.map_bounds is None and all_bounds:
             min_x = min(b[0] for b in all_bounds)
             min_y = min(b[1] for b in all_bounds)
             max_x = max(b[2] for b in all_bounds)
             max_y = max(b[3] for b in all_bounds)
             
-            center_lat = (min_y + max_y) / 2
-            center_lon = (min_x + max_x) / 2
-        else:
-            center_lat, center_lon = 39.8, -98.6  # Center of US
+            st.session_state.map_center = [(min_y + max_y) / 2, (min_x + max_x) / 2]
+            st.session_state.map_bounds = [[min_y, min_x], [max_y, max_x]]
         
-        # Create the base map with multiple tile options
+        # Create the base map with stored state
         m = folium.Map(
-            location=[center_lat, center_lon],
-            zoom_start=6,
-            tiles=None,  # We'll add tiles manually
+            location=st.session_state.map_center,
+            zoom_start=st.session_state.map_zoom,
+            tiles=None,
             control_scale=True
         )
         
@@ -206,8 +197,15 @@ def display_all_layers_map():
             
             color = colors[idx % len(colors)]
             
-            # Create a feature group for this layer (allows toggling)
-            feature_group = folium.FeatureGroup(name=name.replace('_', ' ').title(), show=True)
+            # Initialize layer visibility if not set (new layers default to visible)
+            if name not in st.session_state.layer_visibility:
+                st.session_state.layer_visibility[name] = True
+            
+            # Create a feature group for this layer with stored visibility
+            feature_group = folium.FeatureGroup(
+                name=name.replace('_', ' ').title(), 
+                show=st.session_state.layer_visibility[name]
+            )
             
             # Add GeoJSON to the feature group with proper color handling
             def style_function(feature, color=color):
@@ -301,43 +299,44 @@ def display_all_layers_map():
             force_separate_button=True
         ).add_to(m)
         
-        # Add measure control
-        # plugins.MeasureControl(
-        #     position='topleft',
-        #     primary_length_unit='kilometers',
-        #     secondary_length_unit='miles',
-        #     primary_area_unit='sqkilometers',
-        #     secondary_area_unit='acres'
-        # ).add_to(m)
-        
         # Add mouse position
         plugins.MousePosition().add_to(m)
         
-        # Don't add minimap - removed per user request
-        # minimap = plugins.MiniMap(toggle_display=True)
-        # m.add_child(minimap)
+        # Only fit bounds if we haven't stored a custom view
+        if st.session_state.map_bounds and all_bounds:
+            m.fit_bounds(st.session_state.map_bounds, padding=[50, 50])
         
-        # Fit bounds to show all layers
-        if all_bounds:
-            southwest = [min_y, min_x]
-            northeast = [max_y, max_x]
-            m.fit_bounds([southwest, northeast], padding=[50, 50])
-        
-        # Display the map
-        st_folium(
+        # Display the map and capture state
+        map_data = st_folium(
             m,
             width=None,  # Use full width
             height=500,
-            returned_objects=[],
+            returned_objects=["bounds", "zoom", "center"],
             use_container_width=True
         )
+        
+        # Store the map state for next time
+        if map_data:
+            if map_data.get("center"):
+                st.session_state.map_center = [
+                    map_data["center"]["lat"],
+                    map_data["center"]["lng"]
+                ]
+            if map_data.get("zoom"):
+                st.session_state.map_zoom = map_data["zoom"]
+            if map_data.get("bounds"):
+                bounds = map_data["bounds"]
+                st.session_state.map_bounds = [
+                    [bounds["_southWest"]["lat"], bounds["_southWest"]["lng"]],
+                    [bounds["_northEast"]["lat"], bounds["_northEast"]["lng"]]
+                ]
         
         # Display map legend
         with st.expander("🎨 Map Legend", expanded=False):
             for idx, name in enumerate(st.session_state.geodataframes.keys()):
                 color = colors[idx % len(colors)]
-                # Create a small colored box for the legend
-                st.markdown(f'<span style="color:{color};">⬤</span> **{name.replace("_", " ").title()}**', unsafe_allow_html=True)
+                visibility_icon = "✅" if st.session_state.layer_visibility.get(name, True) else "⬜"
+                st.markdown(f'{visibility_icon} <span style="color:{color};">■</span> **{name.replace("_", " ").title()}**', unsafe_allow_html=True)
     
     except Exception as e:
         st.error(f"Error displaying map: {str(e)}")
@@ -465,8 +464,8 @@ Available skills: {', '.join(skills_list) if skills_list else 'None found'}
 1. **Explore**: When asked for a map/data, IMMEDIATELY use `shell` to read the relevant `SKILL.md`.
    - Command: `cat skills/<skill_name>/SKILL.md`
    - CRITICAL: Use the SHELL tool with cat command and RELATIVE paths:                                                                                           
-   -- ✅ CORRECT: shell tool → `cat skills/<skill_name>/SKILL.md`                                                                                                           tiles=None,  # We'll add tiles manually                                                                                                         
-   -- ❌ WRONG: read_file tool cat sn't work with our paths)                                                                                                            )
+   -- ✅ CORRECT: shell tool → `cat skills/<skill_name>/SKILL.md`                                                                                                           
+   -- ❌ WRONG: read_file tool (doesn't work with our paths)                                                                                                            
    -- ❌ WRONG: absolute paths            
    
 2. **Execute**: Generate and run the Python code exactly as the `SKILL.md` instructs. Use inline Python execution when possible: `python3 -c ...". Avoid creating .py files unless necessary.
@@ -564,9 +563,7 @@ async def handle_user_input_async(user_input):
                     "content": msg["content"]
                 })
 
-            # ==================== FIX STARTS HERE ====================
-            # Append a hidden system instruction to the last user message.
-            # This is sent to the LLM but NOT shown in the UI.
+            # Append a hidden system instruction to the last user message
             if messages_with_history and messages_with_history[-1]["role"] == "user":
                 messages_with_history[-1]["content"] += """
                 
@@ -576,7 +573,6 @@ async def handle_user_input_async(user_input):
                 3. You MUST generate Python code and save the output to the temp directory.
                 4. DO NOT answer from memory.
                 """
-            # ==================== FIX ENDS HERE ====================
             
             stream_input = {"messages": messages_with_history}
             
@@ -624,7 +620,7 @@ async def handle_user_input_async(user_input):
                             tool_name = getattr(message, "name", "")
                             tool_content = getattr(message, "content", "")
 
-                            # ADD THIS DEBUG OUTPUT
+                            # Debug output
                             with tool_calls_container:
                                 with st.expander(f"🔍 {tool_name} output", expanded=False):
                                     st.code(tool_content[:1000])  # Show first 1000 chars
@@ -713,12 +709,10 @@ with st.sidebar:
     st.markdown("---")
     
     # Navigation buttons
-    # col1, col2 = st.columns(2)
-    # with col1:
     if st.button("Conversation", use_container_width=True, type="primary" if st.session_state.current_view == "conversation" else "secondary"):
         st.session_state.current_view = "conversation"
         st.rerun()
-    # with col2:
+    
     if st.button("Map", use_container_width=True, type="primary" if st.session_state.current_view == "map" else "secondary"):
         st.session_state.current_view = "map"
         st.rerun()
@@ -734,6 +728,11 @@ with st.sidebar:
         st.session_state.dataframes = {}
         st.session_state.generated_code = []
         st.session_state.messages = []
+        # Reset map state
+        st.session_state.map_center = [39.8, -98.6]
+        st.session_state.map_zoom = 6
+        st.session_state.map_bounds = None
+        st.session_state.layer_visibility = {}
         st.rerun()
 
 # ========== MAIN CONTENT AREA ==========
@@ -753,8 +752,6 @@ if st.session_state.current_view == "conversation":
 
 elif st.session_state.current_view == "map":
     # Map View
-    # st.markdown("### 🗺️ Geographic Data Layers")
-    
     if not st.session_state.geodataframes:
         st.info("No map layers yet. Start a conversation to generate geographic data!")
     else:
