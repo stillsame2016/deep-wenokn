@@ -46,36 +46,53 @@ if "skills_loaded" not in st.session_state:
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 if "geodataframes" not in st.session_state:
-    st.session_state.geodataframes = {}
+    st.session_state.geodataframes = {}  # Dict: {name: gdf}
 if "dataframes" not in st.session_state:
-    st.session_state.dataframes = {}
+    st.session_state.dataframes = {}  # Dict: {name: df}
 if "generated_code" not in st.session_state:
-    st.session_state.generated_code = []
+    st.session_state.generated_code = []  # List of code snippets
 if "skills_documentation" not in st.session_state:
     st.session_state.skills_documentation = {}
 if "user_session_id" not in st.session_state:
-    st.session_state.user_session_id = str(uuid.uuid4())[:8]
+    st.session_state.user_session_id = str(uuid.uuid4())[:8]  # Unique per session
 if "temp_dir" not in st.session_state:
+    # Create user-specific temp directory
     st.session_state.temp_dir = tempfile.mkdtemp(prefix=f"wenokn_{st.session_state.user_session_id}_")
 if "current_view" not in st.session_state:
-    st.session_state.current_view = "conversation"
+    st.session_state.current_view = "conversation"  # "conversation" or "map"
 
-# --- NEW: Initialize Map State ---
-if "map_state" not in st.session_state:
-    st.session_state.map_state = {
-        "center": [39.8, -98.6],
-        "zoom": 4,
-        "last_active_layers": [], # Track user selection
-        "known_layers": []       # Track which layers have already been processed
-    }
+# current_dir = os.getcwd()
+# for root, dirs, files in os.walk(current_dir):
+#     for file in files:
+#         # Join the root path and filename to get the full path
+#         full_path = os.path.join(root, file)
+#         st.markdown(full_path)
 
+# current_dir = st.session_state.temp_dir
+# st.markdown(f"==================== {current_dir}")
+# for root, dirs, files in os.walk(current_dir):
+#     for file in files:
+#         # Join the root path and filename to get the full path
+#         full_path = os.path.join(root, file)
+#         st.markdown(full_path)
+
+
+
+# Helper function to scan and cache skills documentation
 def scan_skills_documentation():
+    """Scan the skills directory and cache SKILL.md documentation."""
     if st.session_state.skills_documentation:
         return st.session_state.skills_documentation
+    
     current_directory = os.getcwd()
     skills_dir = Path(current_directory) / "skills"
-    if not skills_dir.exists(): return {}
+    
+    if not skills_dir.exists():
+        return {}
+    
     skills_docs = {}
+    
+    # Scan for all SKILL.md files
     for skill_dir in skills_dir.iterdir():
         if skill_dir.is_dir():
             skill_md = skill_dir / "SKILL.md"
@@ -90,9 +107,11 @@ def scan_skills_documentation():
                         }
                 except Exception as e:
                     st.warning(f"Could not read {skill_md}: {e}")
+    
     st.session_state.skills_documentation = skills_docs
     return skills_docs
 
+# Initialize LLM
 def get_llm():
     return ChatOpenAI(
         model="glm-4.6",
@@ -101,245 +120,687 @@ def get_llm():
         temperature=0,
     )
 
+# Function to display all GeoDataFrames as layers on a single map
 def display_all_layers_map():
+    """Display all GeoDataFrames as layers on a single interactive Folium map."""
     if not st.session_state.geodataframes:
         st.info("No geographic data available yet. Start a conversation to generate maps!")
         return
+    
     if not FOLIUM_AVAILABLE:
-        st.error("⚠️ Folium not available.")
+        st.error("⚠️ Folium not available. Install with: `pip install folium streamlit-folium`")
         return
-
+    
     try:
-        # 1. Identify new layers that haven't been 'fitted' yet
-        current_layer_ids = list(st.session_state.geodataframes.keys())
-        new_layer_ids = [l for l in current_layer_ids if l not in st.session_state.map_state["known_layers"]]
-        
-        # 2. Determine initial map view
+        # Calculate overall bounds from all geodataframes
         all_bounds = []
-        for name, gdf in st.session_state.geodataframes.items():
+        for gdf in st.session_state.geodataframes.values():
             if gdf.crs and gdf.crs.to_epsg() != 4326:
                 gdf = gdf.to_crs(epsg=4326)
             all_bounds.append(gdf.total_bounds)
-
-        # Logic: If there are NEW layers, fit the map to them. Otherwise, use saved state.
-        if new_layer_ids and all_bounds:
-            # Calculate bounds of all current data to zoom in
+        
+        # Calculate center
+        if all_bounds:
             min_x = min(b[0] for b in all_bounds)
             min_y = min(b[1] for b in all_bounds)
             max_x = max(b[2] for b in all_bounds)
             max_y = max(b[3] for b in all_bounds)
             
-            initial_location = [(min_y + max_y) / 2, (min_x + max_x) / 2]
-            initial_zoom = st.session_state.map_state["zoom"] # We'll let fit_bounds handle it
-            should_fit = True
-            # Update known layers so we don't force-fit again until next new data
-            st.session_state.map_state["known_layers"] = current_layer_ids
+            center_lat = (min_y + max_y) / 2
+            center_lon = (min_x + max_x) / 2
         else:
-            initial_location = st.session_state.map_state["center"]
-            initial_zoom = st.session_state.map_state["zoom"]
-            should_fit = False
-
+            center_lat, center_lon = 39.8, -98.6  # Center of US
+        
+        # Create the base map with multiple tile options
         m = folium.Map(
-            location=initial_location,
-            zoom_start=initial_zoom,
-            tiles=None,
+            location=[center_lat, center_lon],
+            zoom_start=6,
+            tiles=None,  # We'll add tiles manually
             control_scale=True
         )
-
-        # Basemap Options
-        folium.TileLayer('OpenStreetMap', name='Street Map', overlay=False).add_to(m)
-        folium.TileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', 
-                         attr='Esri', name='Satellite', overlay=False).add_to(m)
-        folium.TileLayer('CartoDB positron', name='Light', overlay=False).add_to(m)
-
-        colors = ['#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F', '#EDC948', '#B07AA1', '#FF9DA7', '#9C755F', '#BAB0AC']
         
-        # 3. Add Layers
+        # Add multiple basemap options
+        folium.TileLayer(
+            tiles='OpenStreetMap',
+            name='Street Map',
+            overlay=False,
+            control=True
+        ).add_to(m)
+        
+        folium.TileLayer(
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri',
+            name='Satellite',
+            overlay=False,
+            control=True
+        ).add_to(m)
+        
+        folium.TileLayer(
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri',
+            name='Topographic',
+            overlay=False,
+            control=True
+        ).add_to(m)
+        
+        folium.TileLayer(
+            tiles='CartoDB positron',
+            name='Light',
+            overlay=False,
+            control=True
+        ).add_to(m)
+        
+        # A professional, muted palette for mapping
+        colors = [
+            '#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F', 
+            '#EDC948', '#B07AA1', '#FF9DA7', '#9C755F', '#BAB0AC',
+            '#1F77B4', '#FF7F0E', '#2CA02C', '#D62728', '#9467BD', 
+            '#8C564B', '#E377C2', '#7F7F7F', '#BCBD22', '#17BECF'
+        ]
+        
+        # Add each geodataframe as a layer
         for idx, (name, gdf) in enumerate(st.session_state.geodataframes.items()):
+            # Ensure WGS84
             if gdf.crs and gdf.crs.to_epsg() != 4326:
                 gdf = gdf.to_crs(epsg=4326)
             
             color = colors[idx % len(colors)]
-            display_name = name.replace('_', ' ').title()
             
-            # Logic: If it's a new layer, it's checked. If old, check against last_active_layers.
-            # If last_active_layers is empty (first run), check everything.
-            if name in new_layer_ids or not st.session_state.map_state["last_active_layers"]:
-                show_layer = True
-            else:
-                show_layer = display_name in st.session_state.map_state["last_active_layers"]
-
-            feature_group = folium.FeatureGroup(name=display_name, show=show_layer)
+            # Create a feature group for this layer (allows toggling)
+            feature_group = folium.FeatureGroup(name=name.replace('_', ' ').title(), show=True)
             
+            # Add GeoJSON to the feature group with proper color handling
             def style_function(feature, color=color):
-                return {'fillColor': color, 'color': color, 'weight': 1.5, 'fillOpacity': 0.4}
+                return {
+                    'fillColor': color,
+                    'color': color,  # This is the line color
+                    'weight': 1.5,
+                    'fillOpacity': 0.4,
+                }
             
-            tooltip_fields = [col for col in gdf.columns if col.lower() not in ['geometry', 'geom', 'the_geom', 'shape']]
-            tooltip = folium.GeoJsonTooltip(fields=tooltip_fields, localize=True, sticky=False, labels=True,
-                                            style="background-color: white; border: 1px solid black; font-size: 11px; max-height: 200px; overflow-y: auto;") if tooltip_fields else None
+            def highlight_function(feature):
+                return {
+                    'fillColor': '#FFFF00',  # Yellow
+                    'color': '#000000',  # Black border
+                    'weight': 2,
+                    'fillOpacity': 0.7,
+                }
+            
+            # Create tooltip with attributes (excluding geometry)
+            tooltip_fields = [col for col in gdf.columns if col.lower() not in ['geometry', 'geom', 'the_geom', 'shape', 'countygeometry', 'rivergeometry', 'stategeometry', 'watershedgeometry', 'damgeometry', 'plantgeometry']]
+            
+            if tooltip_fields:
+                tooltip = folium.GeoJsonTooltip(
+                    fields=tooltip_fields,
+                    aliases=[f"{field}:" for field in tooltip_fields],
+                    localize=True,
+                    sticky=False,
+                    labels=True,
+                    style="""
+                        background-color: white;
+                        border: 1px solid black;
+                        border-radius: 3px;
+                        box-shadow: 3px;
+                        font-size: 11px;
+                        max-width: 300px;
+                        max-height: 300px;
+                        overflow-y: auto;
+                        padding: 8px;
+                    """,
+                )
+            else:
+                tooltip = None
+            
+            # Define the marker style for points
+            point_marker = folium.CircleMarker(
+                radius=2,           # Size in pixels
+                weight=1,           # Border thickness
+                fill=True,
+                fill_opacity=0.7
+            )
             
             folium.GeoJson(
                 gdf,
-                marker=folium.CircleMarker(radius=3, weight=1, fill=True, fill_opacity=0.7),
+                marker=point_marker,
                 style_function=style_function,
+                highlight_function=highlight_function,
                 tooltip=tooltip,
-                name=display_name
+                name=name.replace('_', ' ').title()
             ).add_to(feature_group)
             
             feature_group.add_to(m)
-
-        folium.LayerControl(position='topright', collapsed=False).add_to(m)
-        plugins.Fullscreen(position='topleft').add_to(m)
+        
+        # Add layer control with custom CSS for smaller font
+        layer_control = folium.LayerControl(position='topright', collapsed=False)
+        layer_control.add_to(m)
+        
+        # Add custom CSS to make layer control font smaller
+        custom_css = """
+        <style>
+        .leaflet-control-layers {
+            font-size: 11px !important;
+        }
+        .leaflet-control-layers-base label,
+        .leaflet-control-layers-overlays label {
+            font-size: 11px !important;
+            padding: 2px 5px !important;
+        }
+        .leaflet-control-layers-base,
+        .leaflet-control-layers-overlays {
+            line-height: 1.3 !important;
+        }
+        </style>
+        """
+        m.get_root().html.add_child(folium.Element(custom_css))
+        
+        # Add fullscreen button
+        plugins.Fullscreen(
+            position='topleft',
+            title='Fullscreen',
+            title_cancel='Exit Fullscreen',
+            force_separate_button=True
+        ).add_to(m)
+        
+        # Add measure control
+        # plugins.MeasureControl(
+        #     position='topleft',
+        #     primary_length_unit='kilometers',
+        #     secondary_length_unit='miles',
+        #     primary_area_unit='sqkilometers',
+        #     secondary_area_unit='acres'
+        # ).add_to(m)
+        
+        # Add mouse position
         plugins.MousePosition().add_to(m)
-
-        if should_fit and all_bounds:
-            m.fit_bounds([[min_y, min_x], [max_y, max_x]], padding=[50, 50])
-
-        # 4. Use returned_objects to capture state
-        map_output = st_folium(
+        
+        # Don't add minimap - removed per user request
+        # minimap = plugins.MiniMap(toggle_display=True)
+        # m.add_child(minimap)
+        
+        # Fit bounds to show all layers
+        if all_bounds:
+            southwest = [min_y, min_x]
+            northeast = [max_y, max_x]
+            m.fit_bounds([southwest, northeast], padding=[50, 50])
+        
+        # Display the map
+        st_folium(
             m,
-            width=None,
-            height=600,
-            use_container_width=True,
-            returned_objects=["zoom", "center", "last_active_layers"]
+            width=None,  # Use full width
+            height=500,
+            returned_objects=[],
+            use_container_width=True
         )
-
-        # 5. Save state back to session_state
-        if map_output:
-            if map_output.get("center"):
-                st.session_state.map_state["center"] = [map_output["center"]["lat"], map_output["center"]["lng"]]
-            if map_output.get("zoom"):
-                st.session_state.map_state["zoom"] = map_output["zoom"]
-            if map_output.get("last_active_layers") is not None:
-                st.session_state.map_state["last_active_layers"] = map_output["last_active_layers"]
-
+        
+        # Display map legend
+        with st.expander("🎨 Map Legend", expanded=False):
+            for idx, name in enumerate(st.session_state.geodataframes.keys()):
+                color = colors[idx % len(colors)]
+                # Create a small colored box for the legend
+                st.markdown(f'<span style="color:{color};">⬤</span> **{name.replace("_", " ").title()}**', unsafe_allow_html=True)
+    
     except Exception as e:
         st.error(f"Error displaying map: {str(e)}")
+        import traceback
+        with st.expander("🔍 Error Details"):
+            st.code(traceback.format_exc())
 
+# Function to load GeoJSON/CSV files into session state and clean up
 def load_and_cleanup_temp_files():
-    if not GEOPANDAS_AVAILABLE: return
+    """Load any generated files into session state and clean up temp directory."""
+    if not GEOPANDAS_AVAILABLE:
+        return
+    
     temp_dir = Path(st.session_state.temp_dir)
+    
     try:
-        for gf in temp_dir.glob("*.geojson"):
-            gdf = gpd.read_file(gf)
-            if gdf is not None and len(gdf) > 0:
-                st.session_state.geodataframes[gf.stem] = gdf
-            gf.unlink()
-        for cf in temp_dir.glob("*.csv"):
-            df = pd.read_csv(cf)
-            if df is not None and len(df) > 0:
-                st.session_state.dataframes[cf.stem] = df
-            cf.unlink()
-        for pf in temp_dir.glob("*.py"):
-            with open(pf, 'r') as f:
-                st.session_state.generated_code.append({'name': pf.stem, 'code': f.read(), 'timestamp': pf.stat().st_mtime})
-            pf.unlink()
+        # Check for GeoJSON files
+        geojson_files = list(temp_dir.glob("*.geojson"))
+        for gf in geojson_files:
+            try:
+                gdf = gpd.read_file(gf)
+                if gdf is not None and len(gdf) > 0:
+                    # Store in session state with descriptive name
+                    name = gf.stem
+                    st.session_state.geodataframes[name] = gdf
+                    st.success(f"✅ Loaded {name} into map layers")
+                
+                # Delete the file after loading
+                gf.unlink()
+            except Exception as e:
+                st.error(f"Error loading {gf.name}: {e}")
+        
+        # Check for CSV files
+        csv_files = list(temp_dir.glob("*.csv"))
+        for cf in csv_files:
+            try:
+                df = pd.read_csv(cf)
+                if df is not None and len(df) > 0:
+                    # Store in session state
+                    name = cf.stem
+                    st.session_state.dataframes[name] = df
+                    st.success(f"✅ Loaded {name} data")
+                
+                # Delete the file after loading
+                cf.unlink()
+            except Exception as e:
+                st.error(f"Error loading {cf.name}: {e}")
+        
+        # Check for Python files (generated code)
+        py_files = list(temp_dir.glob("*.py"))
+        for pf in py_files:
+            try:
+                with open(pf, 'r') as f:
+                    code = f.read()
+                    st.session_state.generated_code.append({
+                        'name': pf.stem,
+                        'code': code,
+                        'timestamp': pf.stat().st_mtime
+                    })
+                
+                # Delete the file after loading
+                pf.unlink()
+            except Exception as e:
+                st.error(f"Error loading {pf.name}: {e}")
+                
     except Exception as e:
         st.error(f"Error checking temp files: {str(e)}")
 
+# Initialize agent
 def initialize_agent():
     if st.session_state.agent is None:
         try:
             llm = get_llm()
+            
+            # Setup directories
             assistant_id = "agent"
             current_directory = os.getcwd()
             local_skills_dir = Path(current_directory) / "skills"
-            skills_docs = scan_skills_documentation()
-            skills_list = list(skills_docs.keys()) if skills_docs else []
-            skills_dir = str(local_skills_dir) if local_skills_dir.exists() else settings.ensure_user_skills_dir(assistant_id)
-            skills_middleware = SkillsMiddleware(skills_dir=skills_dir, assistant_id=assistant_id, project_skills_dir=settings.get_project_skills_dir())
-            agent_middleware = [skills_middleware, ShellToolMiddleware(workspace_root=current_directory, execution_policy=HostExecutionPolicy(), env=os.environ)]
             
+            # Scan skills documentation to know what's available
+            skills_docs = scan_skills_documentation()
+            
+            # Just list the skill names, not the full content
+            skills_list = list(skills_docs.keys()) if skills_docs else []
+            
+            # Use local skills directory
+            if local_skills_dir.exists():
+                skills_dir = str(local_skills_dir)
+                project_skills_dir = None
+            else:
+                skills_dir = settings.ensure_user_skills_dir(assistant_id)
+                project_skills_dir = settings.get_project_skills_dir()
+            
+            # Initialize skills middleware
+            skills_middleware = SkillsMiddleware(
+                skills_dir=skills_dir,
+                assistant_id=assistant_id,
+                project_skills_dir=project_skills_dir,
+            )
+            
+            # Create middleware
+            agent_middleware = [
+                skills_middleware,
+                ShellToolMiddleware(
+                    workspace_root=current_directory,
+                    execution_policy=HostExecutionPolicy(),
+                    env=os.environ,
+                ),
+            ]
+            
+            # Updated system prompt with user-specific temp directory
             system_prompt = f"""You are WEN-OKN, a data expert.
+
 ## CORE DIRECTIVE
-You have NO internal knowledge. You MUST use the `shell` tool to read `SKILL.md` files. You MUST use Python code to generate results.
+You have NO internal knowledge of the file system or specific data. 
+You MUST use the `shell` tool to read `SKILL.md` files to know how to perform tasks.
+You MUST use Python code execution to generate results.
+
 ## YOUR SKILLS
+Working directory: /mount/src/deep-wenokn/
 Skills directory: skills/
 Available skills: {', '.join(skills_list) if skills_list else 'None found'}
+
 ## MANDATORY PROTOCOL
-1. Explore: `cat skills/<skill_name>/SKILL.md`
-2. Execute: Run Python code.
-3. Save: Save to {st.session_state.temp_dir}/ (e.g., .geojson or .csv).
-User Temp Directory: {st.session_state.temp_dir}"""
+1. **Explore**: When asked for a map/data, IMMEDIATELY use `shell` to read the relevant `SKILL.md`.
+   - Command: `cat skills/<skill_name>/SKILL.md`
+   - CRITICAL: Use the SHELL tool with cat command and RELATIVE paths:                                                                                           
+   -- ✅ CORRECT: shell tool → `cat skills/<skill_name>/SKILL.md`                                                                                                           tiles=None,  # We'll add tiles manually                                                                                                         
+   -- ❌ WRONG: read_file tool cat sn't work with our paths)                                                                                                            )
+   -- ❌ WRONG: absolute paths            
+   
+2. **Execute**: Generate and run the Python code exactly as the `SKILL.md` instructs. Use inline Python execution when possible: `python3 -c ...". Avoid creating .py files unless necessary.
+3. **Save**: You MUST save outputs to the user's temp directory: {st.session_state.temp_dir}/
+   - Example: `gdf.to_file('{st.session_state.temp_dir}/output.geojson', driver='GeoJSON')`
+
+## ANTI-HALLUCINATION RULES
+- **DO NOT** narrate what you are going to do. Just run the tool.
+- **DO NOT** say "I have saved the file" unless you have successfully executed the Python code that saves it.
+- **DO NOT** guess file paths. If you haven't run the code to create the file, the file does not exist.
+- **NEVER** simulate the output of a tool. If you need to know something, RUN THE TOOL.
+
+**User Temp Directory:** {st.session_state.temp_dir}
+"""
             
-            st.session_state.agent = create_deep_agent(llm, system_prompt=system_prompt, middleware=agent_middleware)
+            # Create the agent WITHOUT checkpointer
+            st.session_state.agent = create_deep_agent(
+                llm,
+                system_prompt=system_prompt,
+                middleware=agent_middleware,
+            )
+            
+            # Store skills info
             st.session_state.skills_loaded = True
+            st.session_state.skills_directory = skills_dir
+            
         except Exception as e:
             st.error(f"❌ Failed to initialize agent: {str(e)}")
+            st.exception(e)
 
+# Initialize agent on first run
 initialize_agent()
 
-TOOL_ICONS = {"shell": "⚡", "execute": "🔧", "read_file": "📖"}
+# Tool icons for display
+TOOL_ICONS = {
+    "read_file": "📖",
+    "write_file": "✏️",
+    "edit_file": "✂️",
+    "ls": "📁",
+    "glob": "📁",
+    "grep": "🔍",
+    "shell": "⚡",
+    "execute": "🔧",
+    "web_search": "🌐",
+    "http_request": "🌐",
+    "task": "🤖",
+    "write_todos": "📋",
+}
 
+def format_tool_display(tool_name: str, args: dict) -> str:
+    """Format tool call for display."""
+    if tool_name == "shell":
+        command = args.get("command", "unknown")
+        if len(command) > 60:
+            command = command[:57] + "..."
+        return f"Executing: {command}"
+    elif tool_name == "read_file":
+        file_path = args.get("file_path", "unknown")
+        return f"Reading: {file_path}"
+    else:
+        args_str = str(args)
+        if len(args_str) > 100:
+            args_str = args_str[:97] + "..."
+        return f"{tool_name}: {args_str}"
+
+# Display chat messages
+def display_messages():
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+# Handle user input
 async def handle_user_input_async(user_input):
+    # Add user message to chat
     st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"): st.markdown(user_input)
+    
+    # Display user message
+    with st.chat_message("user"):
+        st.markdown(user_input)
+    
+    # Get assistant response
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         tool_calls_container = st.container()
+        
         try:
             config = {"metadata": {"assistant_id": "agent"}}
-            messages_with_history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[-10:]]
             
-            # Injection fix for tool usage
-            if messages_with_history[-1]["role"] == "user":
-                messages_with_history[-1]["content"] += "\n\nSYSTEM: Use shell to read SKILL.md first, then run python to save geojson to temp dir."
+            # Build messages with history
+            messages_with_history = []
+            recent_messages = st.session_state.messages[-10:] if len(st.session_state.messages) > 10 else st.session_state.messages
+            for msg in recent_messages:
+                messages_with_history.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+
+            # ==================== FIX STARTS HERE ====================
+            # Append a hidden system instruction to the last user message.
+            # This is sent to the LLM but NOT shown in the UI.
+            if messages_with_history and messages_with_history[-1]["role"] == "user":
+                messages_with_history[-1]["content"] += """
+                
+                SYSTEM INSTRUCTION:
+                1. IGNORE previous conversation style.
+                2. You MUST use the 'shell' tool to read the relevant SKILL.md file first.
+                3. You MUST generate Python code and save the output to the temp directory.
+                4. DO NOT answer from memory.
+                """
+            # ==================== FIX ENDS HERE ====================
+            
+            stream_input = {"messages": messages_with_history}
             
             accumulated_text = ""
-            displayed_ids = set()
-            async for event in st.session_state.agent.astream({"messages": messages_with_history}, config=config, stream_mode="messages"):
-                if isinstance(event, tuple):
-                    message = event[0]
-                    if isinstance(message, AIMessage):
-                        if message.content:
-                            accumulated_text += message.content
-                            response_placeholder.markdown(accumulated_text)
-                        for tc in (message.tool_calls or []):
-                            if tc['id'] not in displayed_ids:
-                                displayed_ids.add(tc['id'])
-                                with tool_calls_container: st.info(f"{TOOL_ICONS.get(tc['name'], '🔧')} Executing {tc['name']}")
-                    elif isinstance(message, ToolMessage):
-                        with tool_calls_container:
-                            with st.expander(f"Output: {message.name}", expanded=False): st.code(message.content[:500])
+            displayed_tool_ids = set()
+            tool_call_count = 0
             
+            # Stream the response
+            try:
+                async for event in st.session_state.agent.astream(
+                    stream_input,
+                    config=config,
+                    stream_mode="messages",
+                ):
+                    if isinstance(event, tuple) and len(event) >= 2:
+                        message, metadata = event[0], event[1] if len(event) > 1 else {}
+                        
+                        if isinstance(message, HumanMessage):
+                            continue
+                        
+                        if isinstance(message, AIMessage):
+                            if hasattr(message, 'content') and isinstance(message.content, str):
+                                if message.content:
+                                    accumulated_text += message.content
+                                    response_placeholder.markdown(accumulated_text)
+                            
+                            if hasattr(message, 'tool_calls') and message.tool_calls:
+                                for tool_call in message.tool_calls:
+                                    tool_id = tool_call.get('id')
+                                    if tool_id and tool_id not in displayed_tool_ids:
+                                        displayed_tool_ids.add(tool_id)
+                                        tool_call_count += 1
+                                        tool_name = tool_call.get('name', 'unknown')
+                                        tool_args = tool_call.get('args', {})
+                                        icon = TOOL_ICONS.get(tool_name, "🔧")
+                                        display_str = format_tool_display(tool_name, tool_args)
+                                        
+                                        with tool_calls_container:
+                                            st.info(f"{icon} {display_str}")
+                                        
+                                        if tool_call_count % 5 == 0:
+                                            await asyncio.sleep(0.1)
+                        
+                        elif isinstance(message, ToolMessage):
+                            tool_name = getattr(message, "name", "")
+                            tool_content = getattr(message, "content", "")
+
+                            # ADD THIS DEBUG OUTPUT
+                            with tool_calls_container:
+                                with st.expander(f"🔍 {tool_name} output", expanded=False):
+                                    st.code(tool_content[:1000])  # Show first 1000 chars
+                            
+                            if isinstance(tool_content, str) and (
+                                tool_content.lower().startswith("error") or
+                                "failed" in tool_content.lower()
+                            ):
+                                with tool_calls_container:
+                                    st.error(f"❌ {tool_name}: {tool_content}")
+            
+            except Exception as stream_error:
+                st.warning("⚠️ Streaming failed, trying direct invocation...")
+                
+                result = await st.session_state.agent.ainvoke(stream_input, config=config)
+                
+                if isinstance(result, dict) and "messages" in result:
+                    last_message = result["messages"][-1]
+                    if hasattr(last_message, 'content') and isinstance(last_message.content, str):
+                        accumulated_text = last_message.content
+                        response_placeholder.markdown(accumulated_text)
+                else:
+                    raise stream_error
+            
+            # Save final response
             if accumulated_text:
                 st.session_state.messages.append({"role": "assistant", "content": accumulated_text})
+            else:
+                default_msg = "✅ I've processed your request."
+                response_placeholder.markdown(default_msg)
+                st.session_state.messages.append({"role": "assistant", "content": default_msg})
+            
+            # Load files from temp directory and clean up
             load_and_cleanup_temp_files()
+            
         except Exception as e:
-            st.error(f"Error: {e}")
+            error_message = f"❌ An error occurred: {str(e)}"
+            st.error(error_message)
+            import traceback
+            with st.expander("🔍 Error Details"):
+                st.code(traceback.format_exc())
+            st.session_state.messages.append({"role": "assistant", "content": error_message})
 
+# Synchronous wrapper
 def handle_user_input(user_input):
-    import nest_asyncio
-    nest_asyncio.apply()
-    asyncio.run(handle_user_input_async(user_input))
-    st.rerun()
+    try:
+        asyncio.run(handle_user_input_async(user_input))
+        st.rerun()
+    except RuntimeError as e:
+        if "cannot be called from a running event loop" in str(e):
+            import nest_asyncio
+            nest_asyncio.apply()
+            asyncio.run(handle_user_input_async(user_input))
+            st.rerun()
+        else:
+            raise
 
-# SIDEBAR
+# ========== SIDEBAR ==========
 with st.sidebar:
     st.markdown("## 🌍 WEN-OKN")
+    
+    # Add custom CSS for button styling
+    st.markdown("""
+        <style>
+        /* Style for primary buttons */
+        div.stButton > button[kind="primary"] {
+            background-color: #1e3a8a !important;
+            color: white !important;
+            border: none !important;
+        }
+        div.stButton > button[kind="primary"]:hover {
+            background-color: #1e40af !important;
+        }
+        /* Style for secondary buttons */
+        div.stButton > button[kind="secondary"] {
+            background-color: #e5e7eb !important;
+            color: #374151 !important;
+            border: 1px solid #d1d5db !important;
+        }
+        div.stButton > button[kind="secondary"]:hover {
+            background-color: #d1d5db !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Navigation buttons
+    # col1, col2 = st.columns(2)
+    # with col1:
     if st.button("Conversation", use_container_width=True, type="primary" if st.session_state.current_view == "conversation" else "secondary"):
         st.session_state.current_view = "conversation"
         st.rerun()
+    # with col2:
     if st.button("Map", use_container_width=True, type="primary" if st.session_state.current_view == "map" else "secondary"):
         st.session_state.current_view = "map"
         st.rerun()
+    
+    st.markdown("---")
+    
+    # Show layer count
+    num_layers = len(st.session_state.geodataframes)
+    st.markdown(f"**Map Layers:** {num_layers}")
+    
     if st.button("Clear All Data", use_container_width=True):
         st.session_state.geodataframes = {}
-        st.session_state.map_state["known_layers"] = []
+        st.session_state.dataframes = {}
+        st.session_state.generated_code = []
         st.session_state.messages = []
         st.rerun()
 
-# MAIN
+# ========== MAIN CONTENT AREA ==========
+
 if st.session_state.current_view == "conversation":
-    st.markdown("### 💬 Chat")
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]): st.markdown(msg["content"])
-    user_input = st.chat_input("Ask about rivers, plants, etc...")
-    if user_input: handle_user_input(user_input)
+    # Conversation View
+    st.markdown("### 💬 Chat with WEN-OKN")
+    
+    # Display existing messages
+    display_messages()
+    
+    # Chat input
+    user_input = st.chat_input("Ask about geographic data: counties, states, rivers, power plants, watersheds...")
+    
+    if user_input:
+        handle_user_input(user_input)
 
 elif st.session_state.current_view == "map":
-    display_all_layers_map()
-    with st.expander("📊 Layer Data"):
+    # Map View
+    # st.markdown("### 🗺️ Geographic Data Layers")
+    
+    if not st.session_state.geodataframes:
+        st.info("No map layers yet. Start a conversation to generate geographic data!")
+    else:
+        # Display the combined map
+        display_all_layers_map()
+        
+        st.markdown("---")
+        st.markdown("### 📊 Layer Management")
+        
+        # Layer controls
         for name, gdf in st.session_state.geodataframes.items():
-            st.write(f"**{name}**")
-            st.dataframe(gdf.drop(columns=['geometry'], errors='ignore'), height=150)
+            with st.expander(f"🗺️ {name.replace('_', ' ').title()} ({len(gdf)} features)"):
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    # Download GeoJSON
+                    geojson_str = gdf.to_json()
+                    st.download_button(
+                        label="📥 GeoJSON",
+                        data=geojson_str,
+                        file_name=f"{name}.geojson",
+                        mime="application/json",
+                        key=f"download_geojson_{name}",
+                        use_container_width=True
+                    )
+                
+                with col2:
+                    # Download CSV (exclude geometry columns)
+                    csv_df = gdf.drop(columns=[col for col in gdf.columns if col.lower() in ['geometry', 'geom', 'the_geom', 'shape']], errors='ignore')
+                    csv_str = csv_df.to_csv(index=False)
+                    st.download_button(
+                        label="📥 CSV",
+                        data=csv_str,
+                        file_name=f"{name}.csv",
+                        mime="text/csv",
+                        key=f"download_csv_{name}",
+                        use_container_width=True
+                    )
+                
+                with col3:
+                    # Delete layer
+                    if st.button("🗑️ Delete", key=f"delete_{name}", use_container_width=True):
+                        del st.session_state.geodataframes[name]
+                        st.rerun()
+                
+                # Show attribute table (exclude geometry columns)
+                st.markdown("**Attributes:**")
+                display_df = gdf.drop(columns=[col for col in gdf.columns if col.lower() in ['geometry', 'geom', 'the_geom', 'shape']], errors='ignore')
+                st.dataframe(display_df, use_container_width=True, height=200)
