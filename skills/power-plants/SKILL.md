@@ -23,7 +23,7 @@ It returns the following columns:
     Street_Add — Street address
     City — City
     County — County
-    State — State
+    State — State. State names must be FULL NAMES, not abbreviations! CORRECT: State='Ohio'. WRONG: State='OH'.
     Zip — Zip code
     PrimSource — Primary energy source
     source_des — Energy sources and summer capacities
