@@ -688,7 +688,7 @@ async def handle_user_input_async(user_input):
                                                     if tool_name == 'write_todos':
                                                         todos = data.get("todos", [])
                                                         for todo in todos:
-                                                            st.markdown(todo)
+                                                            st.json(todo)
                                                     else:
                                                         st.json(tool_args)
                                                 
