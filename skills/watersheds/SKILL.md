@@ -13,7 +13,6 @@ This skill gets the geometries and other attributes of watersheds by accessing t
 
 It returns the following columns:
 
-
 objectid: System-assigned unique identifier for each watershed feature in the service.
 areaacres: Total area of the watershed measured in acres.
 areasqkm: Total area of the watershed measured in square kilometers.
