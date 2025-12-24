@@ -720,34 +720,29 @@ async def handle_user_input_async(user_input):
                             tool_name = getattr(message, "name", "")
                             tool_content = getattr(message, "content", "")
 
-                            # Special handling for write_todos tool
-                            if tool_name == "write_todos":
-                                with tool_calls_container:
-                                    render_todo_viewer(tool_content)
-                            else:
-                                # Enhanced debug output with full content and better formatting
-                                with tool_calls_container:
-                                    # Show a preview with character count
-                                    preview_length = 500
-                                    is_truncated = len(tool_content) > preview_length
+                            # Enhanced debug output with full content and better formatting
+                            with tool_calls_container:
+                                # Show a preview with character count
+                                preview_length = 500
+                                is_truncated = len(tool_content) > preview_length
+                                
+                                expander_title = f"🔍 {tool_name} output ({len(tool_content)} chars)"
+                                if is_truncated:
+                                    expander_title += " - Click to see full output"
+                                
+                                with st.expander(expander_title, expanded=False):
+                                    # Show full content without truncation
+                                    st.code(tool_content, language="python" if "import" in tool_content[:100] else "text")
                                     
-                                    expander_title = f"🔍 {tool_name} output ({len(tool_content)} chars)"
-                                    if is_truncated:
-                                        expander_title += " - Click to see full output"
-                                    
-                                    with st.expander(expander_title, expanded=False):
-                                        # Show full content without truncation
-                                        st.code(tool_content, language="python" if "import" in tool_content[:100] else "text")
-                                        
-                                        # Add download button for long outputs
-                                        if len(tool_content) > 1000:
-                                            st.download_button(
-                                                label="📥 Download Full Output",
-                                                data=tool_content,
-                                                file_name=f"{tool_name}_output.txt",
-                                                mime="text/plain",
-                                                key=f"download_{tool_name}_{hash(tool_content)}"
-                                            )
+                                    # Add download button for long outputs
+                                    if len(tool_content) > 1000:
+                                        st.download_button(
+                                            label="📥 Download Full Output",
+                                            data=tool_content,
+                                            file_name=f"{tool_name}_output.txt",
+                                            mime="text/plain",
+                                            key=f"download_{tool_name}_{hash(tool_content)}"
+                                        )
                             
                             # Keep the error detection
                             if isinstance(tool_content, str) and (
