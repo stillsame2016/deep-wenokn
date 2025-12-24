@@ -120,7 +120,7 @@ def get_llm():
         api_key=st.secrets["XIAOMI_API_KEY"],
         temperature=st.session_state.get("temp_slider", 0.3),
         top_p=0.95,
-        stream=False,
+        stream=True,
         stop=None,
         frequency_penalty=0,
         presence_penalty=0,
