@@ -90,7 +90,7 @@ This code gets a dataframe from the SPARQL query
 
 ## Examples
 
-### Example 1: Find all dams in counties
+### Example 1: Find all dams in some counties
 
 **User Request:** "Find all dams in Ross County and Scioto County, Ohio"
 
@@ -111,9 +111,8 @@ SELECT ?damName ?damGeometry ?countyName
 WHERE {
     # User-provided counties - FILTER EARLY
     VALUES ?inputCounty {
-         "San Diego County"
-         "Orange County, California"
-         "Los Angeles County"
+         "Ross County, Ohio"
+         "Scioto County, Ohio"
     }
     
     # Counties (AdministrativeRegion_2) - FILTERED BY NAME FIRST
