@@ -1,6 +1,6 @@
 ---
 name: watersheds
-description: Use this skill for the requests related to the watersheds in USA; it provides a way to get watersheds as a GeoDataframe in GeoPandas
+description: Use this skill for the requests to retrieve the watersheds in USA as a GeoDataframe in GeoPandas. Note that this skill can retrieve all watersheds intersecting with some states directly.
 ---
 
 # Watersheds Skill
