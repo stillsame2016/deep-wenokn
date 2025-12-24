@@ -130,7 +130,7 @@ def get_llm():
     # )
 
     return ChatOpenAI(
-        model="glm-4.7",
+        model="glm-4.6",
         base_url="https://ellm.nrp-nautilus.io/v1",
         api_key=os.environ.get("NRP_API_KEY"),
         temperature=0,
