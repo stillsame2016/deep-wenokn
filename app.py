@@ -719,30 +719,35 @@ async def handle_user_input_async(user_input):
                         elif isinstance(message, ToolMessage):
                             tool_name = getattr(message, "name", "")
                             tool_content = getattr(message, "content", "")
-                        
-                            # Enhanced debug output with full content and better formatting
-                            with tool_calls_container:
-                                # Show a preview with character count
-                                preview_length = 500
-                                is_truncated = len(tool_content) > preview_length
-                                
-                                expander_title = f"🔍 {tool_name} output ({len(tool_content)} chars)"
-                                if is_truncated:
-                                    expander_title += " - Click to see full output"
-                                
-                                with st.expander(expander_title, expanded=False):
-                                    # Show full content without truncation
-                                    st.code(tool_content, language="python" if "import" in tool_content[:100] else "text")
+
+                            # Special handling for write_todos tool
+                            if tool_name == "write_todos":
+                                with tool_calls_container:
+                                    render_todo_viewer(tool_content)
+                            else:
+                                # Enhanced debug output with full content and better formatting
+                                with tool_calls_container:
+                                    # Show a preview with character count
+                                    preview_length = 500
+                                    is_truncated = len(tool_content) > preview_length
                                     
-                                    # Add download button for long outputs
-                                    if len(tool_content) > 1000:
-                                        st.download_button(
-                                            label="📥 Download Full Output",
-                                            data=tool_content,
-                                            file_name=f"{tool_name}_output.txt",
-                                            mime="text/plain",
-                                            key=f"download_{tool_name}_{hash(tool_content)}"
-                                        )
+                                    expander_title = f"🔍 {tool_name} output ({len(tool_content)} chars)"
+                                    if is_truncated:
+                                        expander_title += " - Click to see full output"
+                                    
+                                    with st.expander(expander_title, expanded=False):
+                                        # Show full content without truncation
+                                        st.code(tool_content, language="python" if "import" in tool_content[:100] else "text")
+                                        
+                                        # Add download button for long outputs
+                                        if len(tool_content) > 1000:
+                                            st.download_button(
+                                                label="📥 Download Full Output",
+                                                data=tool_content,
+                                                file_name=f"{tool_name}_output.txt",
+                                                mime="text/plain",
+                                                key=f"download_{tool_name}_{hash(tool_content)}"
+                                            )
                             
                             # Keep the error detection
                             if isinstance(tool_content, str) and (
@@ -1018,3 +1023,160 @@ elif st.session_state.current_view == "map":
                     #         'Null': df.isna().sum()
                     #     })
                     #     st.dataframe(col_info, use_container_width=True, hide_index=True)
+
+
+def render_todo_viewer(tool_content):
+    """
+    Render a nicely formatted todo list viewer for the write_todos tool output.
+    
+    Args:
+        tool_content (str): The JSON string containing todos
+    """
+    try:
+        # Parse the JSON content
+        data = json.loads(tool_content)
+        todos = data.get("todos", [])
+        
+        if not todos:
+            st.info("No todos found")
+            return
+        
+        # Custom CSS for todo styling
+        st.markdown("""
+        <style>
+        .todo-container {
+            margin: 10px 0;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 4px solid;
+            background-color: #f8f9fa;
+        }
+        .todo-pending {
+            border-left-color: #6c757d;
+            background-color: #f8f9fa;
+        }
+        .todo-in-progress {
+            border-left-color: #0d6efd;
+            background-color: #e7f1ff;
+        }
+        .todo-complete {
+            border-left-color: #198754;
+            background-color: #d1f5e7;
+        }
+        .todo-content {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: #212529;
+        }
+        .todo-status {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .status-pending {
+            color: #6c757d;
+        }
+        .status-in-progress {
+            color: #0d6efd;
+        }
+        .status-complete {
+            color: #198754;
+        }
+        .todo-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #212529;
+        }
+        .todo-index {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: #dee2e6;
+            color: #495057;
+            text-align: center;
+            line-height: 24px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Header with count
+        st.markdown(f'<div class="todo-header">📋 Task Plan ({len(todos)} tasks)</div>', unsafe_allow_html=True)
+        
+        # Count by status
+        status_counts = {"pending": 0, "in_progress": 0, "complete": 0}
+        for todo in todos:
+            status = todo.get("status", "pending")
+            status_counts[status] = status_counts.get(status, 0) + 1
+        
+        # Status summary with columns
+        cols = st.columns(3)
+        with cols[0]:
+            st.metric("⏳ Pending", status_counts.get("pending", 0))
+        with cols[1]:
+            st.metric("🔄 In Progress", status_counts.get("in_progress", 0))
+        with cols[2]:
+            st.metric("✅ Complete", status_counts.get("complete", 0))
+        
+        st.markdown("---")
+        
+        # Status emoji mapping
+        status_emoji = {
+            "pending": "⏳",
+            "in_progress": "🔄",
+            "complete": "✅"
+        }
+        
+        # Status color classes
+        status_classes = {
+            "pending": "todo-pending",
+            "in_progress": "todo-in-progress",
+            "complete": "todo-complete"
+        }
+        
+        status_text_classes = {
+            "pending": "status-pending",
+            "in_progress": "status-in-progress",
+            "complete": "status-complete"
+        }
+        
+        # Render each todo
+        for idx, todo in enumerate(todos, 1):
+            content = todo.get("content", "No content")
+            status = todo.get("status", "pending")
+            
+            status_class = status_classes.get(status, "todo-pending")
+            status_text_class = status_text_classes.get(status, "status-pending")
+            emoji = status_emoji.get(status, "⏳")
+            
+            # Format status text
+            status_display = status.replace("_", " ").title()
+            
+            # Render todo item
+            st.markdown(f"""
+            <div class="todo-container {status_class}">
+                <div class="todo-content">
+                    <span class="todo-index">{idx}</span>{content}
+                </div>
+                <div class="todo-status {status_text_class}">
+                    {emoji} {status_display}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+    except json.JSONDecodeError as e:
+        st.error(f"Failed to parse todo JSON: {e}")
+        with st.expander("📄 Raw Content"):
+            st.code(tool_content, language="json")
+    except Exception as e:
+        st.error(f"Error rendering todos: {e}")
+        with st.expander("📄 Raw Content"):
+            st.code(tool_content, language="json")
+
+
