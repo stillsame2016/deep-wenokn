@@ -128,6 +128,8 @@ watersheds = get_features(url, where)
 
 ## Notes
 
+Fetching all watersheds in a state may take about one minute.
+
 ### Understanding the bbox Parameter
 
 The **bbox (bounding box) parameter** is essential for efficient spatial queries:
