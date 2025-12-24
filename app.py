@@ -125,7 +125,7 @@ def get_llm():
         frequency_penalty=0,
         presence_penalty=0,
         extra_body={
-            "thinking": {"type": "enabled"}
+            "thinking": {"type": "disabled"}
         }
     )
 
