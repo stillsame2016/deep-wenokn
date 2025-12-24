@@ -685,6 +685,7 @@ async def handle_user_input_async(user_input):
                                                         except:
                                                             st.code(command, language="bash")
                                                 else:
+                                                    st.markdown(tool_name)
                                                     st.json(tool_args)
                                                 
                                                 # Add download button for shell commands
