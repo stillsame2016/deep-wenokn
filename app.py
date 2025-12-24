@@ -894,6 +894,8 @@ with st.sidebar:
         st.session_state.dataframes = {}
         st.session_state.generated_code = []
         st.session_state.messages = []
+        shutil.rmtree(st.session_state.temp_dir)
+        os.makedirs(st.session_state.temp_dir)
         st.rerun()
 
 # ========== MAIN CONTENT AREA ==========
