@@ -114,20 +114,20 @@ def scan_skills_documentation():
 # Initialize LLM
 def get_llm():
 
-    # return ChatOpenAI(
-    #     model="mimo-v2-flash",
-    #     base_url="https://api.xiaomimimo.com/v1",
-    #     api_key=st.secrets["XIAOMI_API_KEY"],
-    #     temperature=st.session_state.get("temp_slider", 0.3),
-    #     top_p=0.95,
-    #     stream=True,
-    #     stop=None,
-    #     frequency_penalty=0,
-    #     presence_penalty=0,
-    #     extra_body={
-    #         "thinking": {"type": "disabled"}
-    #     }
-    # )
+    return ChatOpenAI(
+        model="mimo-v2-flash",
+        base_url="https://api.xiaomimimo.com/v1",
+        api_key=st.secrets["XIAOMI_API_KEY"],
+        temperature=0,
+        top_p=0.95,
+        stream=True,
+        stop=None,
+        frequency_penalty=0,
+        presence_penalty=0,
+        extra_body={
+            "thinking": {"type": "disabled"}
+        }
+    )
 
     # return ChatOpenAI(
     #     model="glm-4.6",
@@ -136,12 +136,12 @@ def get_llm():
     #     temperature=0,
     # )
 
-    return ChatOpenAI(
-        model="minimax-m2",
-        base_url="https://ellm.nrp-nautilus.io/v1",
-        api_key=os.environ.get("NRP_API_KEY"),
-        temperature=0,
-    )
+    # return ChatOpenAI(
+    #     model="minimax-m2",
+    #     base_url="https://ellm.nrp-nautilus.io/v1",
+    #     api_key=os.environ.get("NRP_API_KEY"),
+    #     temperature=0,
+    # )
 
 # Function to display all GeoDataFrames as layers on a single map
 def display_all_layers_map():
