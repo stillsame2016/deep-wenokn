@@ -12,7 +12,7 @@ This skill gets the geometries of dams in USA by quering GeoConnex knowledge gra
 ## When to Use
 
 - Find dam geometries by names
-- Find dams within a region
+- Find dams in a region, for example, in a county or a state.
 - Find dams on a river
 - Find dams with spatial relation with other objects
 
@@ -20,7 +20,7 @@ This skill gets the geometries of dams in USA by quering GeoConnex knowledge gra
 
 ### Step 1: Construct a SPARQL query
 
-The following SPARQL gets the dam geometry by a name.
+The following SPARQL gets the dam by a name.
 
 ```
 PREFIX aschema: <https://schema.ld.admin.ch/>
@@ -90,7 +90,7 @@ This code gets a dataframe from the SPARQL query
 
 ## Examples
 
-### Example 1: Find all dams in Ross County and Scioto County, Ohio"
+### Example 1: Find all dams in Ross County, Ohio"
 
 Use the following SPARQL query:
 
@@ -108,7 +108,6 @@ WHERE {
     # User-provided counties - FILTER EARLY
     VALUES ?inputCounty {
          "Ross County, Ohio"
-         "Scioto County, Ohio"
     }
     
     # Counties (AdministrativeRegion_2) - FILTERED BY NAME FIRST
