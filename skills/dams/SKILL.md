@@ -12,7 +12,7 @@ Retrieves dam geometries from the GeoConnex knowledge graph on FRINK using SPARQ
 ## When to Use
 
 - Find dams by name
-- Find dams within counties or states
+- Find dams within counties or states (Use the code provided in the examples)
 - Find dams near rivers or other geographic features
 - Spatial analysis involving dams
 
