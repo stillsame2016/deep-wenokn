@@ -687,8 +687,15 @@ async def handle_user_input_async(user_input):
                                                 else:
                                                     if tool_name == 'write_todos':
                                                         todos = tool_args.get("todos", [])
+                                                        status_emoji = {
+                                                            "pending": "⏳",
+                                                            "in_progress": "🔄",
+                                                            "complete": "✅"
+                                                        }
                                                         for todo in todos:
-                                                            st.markdown(todo)
+                                                            status = todo.get("status")
+                                                            content = todo.get("content")
+                                                            st.markdown(f"{status_emoji[status]} {content}")
                                                     else:
                                                         st.json(tool_args)
                                                 
