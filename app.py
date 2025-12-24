@@ -374,7 +374,7 @@ def display_all_layers_map():
             width=None,  # Use full width
             height=500,
             returned_objects=[],
-            use_container_width=True
+            width=True
         )
         
         # Display map legend
