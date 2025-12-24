@@ -1,175 +1,202 @@
 ---
 name: dams
-description: Use this skill for the requests related to the geometry definitions of dams in USA; it provides a way to get the geometries of dams as a GeoDataframe. 
+description: Query dam geometries in the USA from the GeoConnex knowledge graph. Returns dam locations and metadata as a GeoDataFrame.
 ---
 
 # Dams Skill
 
 ## Description
 
-This skill gets the geometries of dams in USA by quering GeoConnex knowledge graph on FRINK using their names.
+Retrieves dam geometries from the GeoConnex knowledge graph on FRINK using SPARQL queries. Returns results as a GeoPandas GeoDataFrame.
 
 ## When to Use
 
-- Find dam geometries by names
-- Find dams in a region, for example, in a county or a state.
-- Find dams on a river
-- Find dams with spatial relation with other objects
+- Find dams by name
+- Find dams within counties or states
+- Find dams near rivers or other geographic features
+- Spatial analysis involving dams
 
-## How to Use
+## Implementation Steps
 
-### Step 1: Construct a SPARQL query
+### 1. Build SPARQL Query
 
-The following SPARQL gets the dam by a name.
+All dam queries follow this basic pattern:
 
-```
-PREFIX aschema: <https://schema.ld.admin.ch/>
-PREFIX hyf: <https://www.opengis.net/def/schema/hy_features/hyf/>
+```sparql
 PREFIX schema: <https://schema.org/>
 PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
-PREFIX kwg-ont: <http://stko-kwg.geog.ucsb.edu/lod/ontology/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
 SELECT ?damName ?damGeometry ?damDescription
-WHERE {{  
+WHERE {  
     ?dam a schema:Place;
          schema:provider "https://nid.usace.army.mil"^^<https://schema.org/url>;
          schema:name ?damName ;
          schema:description ?damDescription;
          geo:hasGeometry/geo:asWKT ?damGeometry.
     FILTER(STRSTARTS(STR(?dam), "https://geoconnex.us/ref/dams/")) 
-    FILTER(STRSTARTS(LCASE(STR(?damName)), LCASE("{dam_name}")))
-}}
-LIMIT 1
+}
 ```
 
-### Step 2: Send the SPARQL query to the FRINK endpoint
+### 2. Execute Query
 
-Use the library sparql_dataframe, you can do
-```
-    pip install sparql_dataframe
+```python
+import sparql_dataframe
 
-    import sparql_dataframe
-    endpoint_url = "https://frink.apps.renci.org/federation/sparql"
-    df = sparql_dataframe.get(endpoint_url, query)
-```
-This code gets a dataframe from the SPARQL query
-
-### Step 3: Wrap the dataframe as a GeoDataframe
-
-```
-    # Identify the WKT column automatically
-    wkt_col = None
-    for col in df.columns:
-        # Check if the column name suggests it's a geometry column
-        col_lower = col.lower()
-        if 'geometry' in col_lower or 'geom' in col_lower or 'wkt' in col_lower:
-            # Verify it actually contains WKT by checking if MOST values start with valid WKT types
-            sample = df[col].dropna().astype(str)
-            if len(sample) > 0:
-                valid_wkt = sample.str.match(r'^(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON|GEOMETRYCOLLECTION)\s*\(')
-                if valid_wkt.sum() / len(sample) > 0.5:  # More than 50% are valid WKT
-                    wkt_col = col
-                    break
-
-    if wkt_col is None:
-        raise ValueError("No WKT geometry column found in SPARQL result.")
-
-    # Drop missing geometries
-    df = df.dropna(subset=[wkt_col]).copy()
-
-    # Convert WKT to shapely geometries
-    df['geometry'] = df[wkt_col].apply(wkt.loads)
-
-    # Create GeoDataFrame
-    gdf = gpd.GeoDataFrame(df, geometry='geometry', crs="EPSG:4326")
-
+endpoint_url = "https://frink.apps.renci.org/federation/sparql"
+df = sparql_dataframe.get(endpoint_url, query)
 ```
 
-## Examples
+### 3. Convert to GeoDataFrame
 
-### Example 1: Find all dams in Ross County, Ohio"
+```python
+import geopandas as gpd
+from shapely import wkt
 
-Use the following SPARQL query:
+# Auto-detect WKT column
+wkt_col = None
+for col in df.columns:
+    col_lower = col.lower()
+    if 'geometry' in col_lower or 'geom' in col_lower or 'wkt' in col_lower:
+        sample = df[col].dropna().astype(str)
+        if len(sample) > 0:
+            valid_wkt = sample.str.match(r'^(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON|GEOMETRYCOLLECTION)\s*\(')
+            if valid_wkt.sum() / len(sample) > 0.5:
+                wkt_col = col
+                break
 
+if wkt_col is None:
+    raise ValueError("No WKT geometry column found")
+
+# Create GeoDataFrame
+df = df.dropna(subset=[wkt_col]).copy()
+df['geometry'] = df[wkt_col].apply(wkt.loads)
+gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
 ```
-PREFIX hyf: <https://www.opengis.net/def/schema/hy_features/hyf/>
+
+## Query Patterns
+
+### Find Dams by Name
+
+Add a name filter:
+
+```sparql
+FILTER(STRSTARTS(LCASE(STR(?damName)), LCASE("deer creek")))
+```
+
+### Find Dams in Counties
+
+**Always use this pattern for county queries** - spatial filtering on the server is much faster:
+
+```sparql
+SELECT ?damName ?damGeometry ?countyName
+WHERE {
+    # Specify counties
+    VALUES ?inputCounty {
+        "Ross County, Ohio"
+        "Scioto County, Ohio"
+    }
+    
+    # Get county geometries (filter early)
+    ?county rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_2>;
+            rdfs:label ?countyName;
+            geo:hasGeometry/geo:asWKT ?countyGeometry.
+    FILTER(STRSTARTS(STR(?county), "http://stko-kwg.geog.ucsb.edu/lod/resource/"))
+    FILTER(STRSTARTS(LCASE(STR(?countyName)), LCASE(?inputCounty)))
+    
+    # Get dams
+    ?dam schema:provider "https://nid.usace.army.mil"^^<https://schema.org/url>;
+         schema:name ?damName;
+         geo:hasGeometry/geo:asWKT ?damGeometry.
+    FILTER(STRSTARTS(STR(?dam), "https://geoconnex.us/ref/dams/"))
+    
+    # Spatial filter (on server)
+    FILTER(geof:sfContains(?countyGeometry, ?damGeometry))
+}
+```
+
+### Find Dams in States
+
+```sparql
+SELECT ?damName ?damGeometry ?stateName
+WHERE {
+    # Specify states
+    VALUES ?inputState {
+        "Ohio"
+        "Kentucky"
+    }
+    
+    # Get state geometries
+    ?state rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_1>;
+           rdfs:label ?stateName;
+           geo:hasGeometry/geo:asWKT ?stateGeometry.
+    FILTER(STRSTARTS(STR(?state), "http://stko-kwg.geog.ucsb.edu/lod/resource/"))
+    FILTER(STRSTARTS(LCASE(STR(?stateName)), LCASE(?inputState)))
+    
+    # Get dams
+    ?dam schema:provider "https://nid.usace.army.mil"^^<https://schema.org/url>;
+         schema:name ?damName;
+         geo:hasGeometry/geo:asWKT ?damGeometry.
+    FILTER(STRSTARTS(STR(?dam), "https://geoconnex.us/ref/dams/"))
+    
+    # Spatial filter
+    FILTER(geof:sfContains(?stateGeometry, ?damGeometry))
+}
+```
+
+## Important Notes
+
+- **Spatial filtering**: Always do spatial filtering in SPARQL using `geof:sfContains()` rather than post-processing in Python. This is dramatically faster.
+- **Dams on rivers**: Due to GIS precision limits, dams (stored as points) may not intersect river geometries exactly. Use a 30-meter buffer around rivers, but note that FRINK's QLever doesn't support `geof:buffer()` - you must buffer in GeoPandas after querying.
+- **Performance**: Queries for large regions (entire states) may take up to 1 minute.
+- **Data scope**: Only dam data from the National Inventory of Dams (NID) is available. Don't assume other infrastructure types are in FRINK.
+
+## Complete Example
+
+**Query**: "Find all dams in Ross County, Ohio"
+
+```python
+import sparql_dataframe
+import geopandas as gpd
+from shapely import wkt
+
+query = '''
 PREFIX schema: <https://schema.org/>
 PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
-PREFIX kwg-ont: <http://stko-kwg.geog.ucsb.edu/lod/ontology/>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
 SELECT ?damName ?damGeometry ?countyName
 WHERE {
-    # User-provided counties - FILTER EARLY
-    VALUES ?inputCounty {
-         "Ross County, Ohio"
-    }
+    VALUES ?inputCounty { "Ross County, Ohio" }
     
-    # Counties (AdministrativeRegion_2) - FILTERED BY NAME FIRST
-    ?county rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_2> ;
-            rdfs:label ?countyName ;
-            geo:hasGeometry/geo:asWKT ?countyGeometry .
+    ?county rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_2>;
+            rdfs:label ?countyName;
+            geo:hasGeometry/geo:asWKT ?countyGeometry.
     FILTER(STRSTARTS(STR(?county), "http://stko-kwg.geog.ucsb.edu/lod/resource/"))
     FILTER(STRSTARTS(LCASE(STR(?countyName)), LCASE(?inputCounty)))
     
-    # Dams - ONLY AFTER COUNTIES ARE FILTERED
     ?dam schema:provider "https://nid.usace.army.mil"^^<https://schema.org/url>;
-         schema:name ?damName ;
-         geo:hasGeometry/geo:asWKT ?damGeometry .
+         schema:name ?damName;
+         geo:hasGeometry/geo:asWKT ?damGeometry.
     FILTER(STRSTARTS(STR(?dam), "https://geoconnex.us/ref/dams/"))
     
-    # Spatial containment - LAST, on reduced dataset
     FILTER(geof:sfContains(?countyGeometry, ?damGeometry))
 }
+'''
+
+endpoint_url = "https://frink.apps.renci.org/federation/sparql"
+df = sparql_dataframe.get(endpoint_url, query)
+
+# Convert to GeoDataFrame
+wkt_col = [c for c in df.columns if 'geometry' in c.lower() or 'geom' in c.lower()][0]
+df['geometry'] = df[wkt_col].apply(wkt.loads)
+gdf = gpd.GeoDataFrame(df, geometry='geometry', crs='EPSG:4326')
+
+print(f"Found {len(gdf)} dams in Ross County, Ohio")
+for _, row in gdf.iterrows():
+    print(f"- {row['damName']}")
 ```
-
-### Example 2: Find all dams in Ohio and Kentucky"
-
-Use the following SPARQL query:
-
-```
-PREFIX hyf: <https://www.opengis.net/def/schema/hy_features/hyf/>
-PREFIX schema: <https://schema.org/>
-PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
-PREFIX kwg-ont: <http://stko-kwg.geog.ucsb.edu/lod/ontology/>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-
-SELECT ?damName ?damGeometry
-WHERE {
-    ?dam schema:provider "https://nid.usace.army.mil"^^<https://schema.org/url> ;
-         schema:name ?damName ;
-         geo:hasGeometry/geo:asWKT ?damGeometry .
-    FILTER(STRSTARTS(STR(?dam), "https://geoconnex.us/ref/dams/"))
-
-    ?state rdf:type <http://stko-kwg.geog.ucsb.edu/lod/ontology/AdministrativeRegion_1> ;
-           rdfs:label ?stateName ;
-           geo:hasGeometry/geo:asWKT ?stateGeometry .
-    FILTER(STRSTARTS(STR(?state), "http://stko-kwg.geog.ucsb.edu/lod/resource/"))
-
-    VALUES ?inputState {
-        "Ohio"
-        "Kentucky"
-    }
-    FILTER(STRSTARTS(LCASE(STR(?stateName)), LCASE(?inputState)))
-    FILTER(geof:sfContains(?stateGeometry, ?damGeometry))
-}
-```
-
-**Notes:**
-
-Because of GIS accuracy limits, you can’t reliably find dams on a river by checking direct geometric intersections. 
-A dam is stored as a point, and that point often won’t line up exactly with the river geometry. A better approach 
-is to apply a 30-meters buffer around the river and then check whether the dam point falls within that buffered area.
-
-Qlever used by FRINK doesn't support the sfBuffer function. You have to do it through geopandas. 
-
-Querying dams in a large region may take up to one miniute time.
-
-Unless explicitly stated, do not assume FRINK contains other types of data.
