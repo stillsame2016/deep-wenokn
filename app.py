@@ -685,8 +685,10 @@ async def handle_user_input_async(user_input):
                                                         except:
                                                             st.code(command, language="bash")
                                                 else:
-                                                    st.markdown(tool_name)
-                                                    st.json(tool_args)
+                                                    if tool_name == 'write_todos':
+                                                        st.markdown(tool_name)
+                                                    else:
+                                                        st.json(tool_args)
                                                 
                                                 # Add download button for shell commands
                                                 if tool_name == "shell" and "command" in tool_args:
