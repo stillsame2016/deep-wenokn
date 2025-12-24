@@ -690,7 +690,7 @@ async def handle_user_input_async(user_input):
                                                         status_emoji = {
                                                             "pending": "⏳",
                                                             "in_progress": "🔄",
-                                                            "complete": "✅"
+                                                            "completed": "✅"
                                                         }
                                                         for todo in todos:
                                                             status = todo.get("status")
