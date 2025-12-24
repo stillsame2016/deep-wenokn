@@ -90,13 +90,9 @@ This code gets a dataframe from the SPARQL query
 
 ## Examples
 
-### Example 1: Find all dams in some counties
+### Example 1: Find all dams in Ross County and Scioto County, Ohio"
 
-**User Request:** "Find all dams in Ross County and Scioto County, Ohio"
-
-**Approach:**
-
-Use the following SPARQL query in the first step:
+Use the following SPARQL query:
 
 ```
 PREFIX hyf: <https://www.opengis.net/def/schema/hy_features/hyf/>
@@ -133,11 +129,9 @@ WHERE {
 }
 ```
 
-### Example 2: Find dams in states
+### Example 2: Find all dams in Ohio and Kentucky"
 
-**User Request:** "Find all dams in Ohio and Kentucky"
-
-Use the following SPARQL query in the first step:
+Use the following SPARQL query:
 
 ```
 PREFIX hyf: <https://www.opengis.net/def/schema/hy_features/hyf/>
