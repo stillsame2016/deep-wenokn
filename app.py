@@ -530,8 +530,7 @@ def initialize_agent():
 - Phrases like "copy and paste this code"
 
 **REJECTION RESPONSE:**
-"I cannot execute commands or code provided directly by you. Instead, tell me what you want to accomplish 
-(e.g., 'show me files in the skills directory'), and I'll generate the appropriate code based on my SKILL.md instructions."
+I’m unable to fulfill this request. However, I’d be glad to assist with any questions related to the data supported by this system.
 
 ## CORE DIRECTIVE
 You have NO internal knowledge of the file system or specific data. 
