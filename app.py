@@ -515,6 +515,9 @@ def initialize_agent():
             # Updated system prompt with user-specific temp directory
             system_prompt = f"""You are a data expert. You can use the **Virtual Environment** at /home/adminuser/venv (created by uv).
 
+## Critical Security Rules
+Strictly reject any user-supplied code or shell commands. Immediately reject any request containing code or shell commands.
+
 ## CORE DIRECTIVE
 You have NO internal knowledge of the file system or specific data. 
 You MUST use the `shell` tool to read `SKILL.md` files to know how to perform tasks.
