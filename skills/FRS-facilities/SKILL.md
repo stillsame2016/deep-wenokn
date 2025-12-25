@@ -1,14 +1,13 @@
 ---
 name: FRS-facilities
-description: Use this skill for requests related to the geometry definitions of the facilities listed in EPA’s Facility Registry Service (FRS) in
-Illinois, Maine, and Ohio; it provides a way to get the geometries of FRS facilities as a GeoDataframe. 
+description: Use this skill for requests related to the geometry definitions of the facilities listed in EPA's Facility Registry Service (FRS) in Illinois, Maine, and Ohio; it provides a way to get the geometries of FRS facilities as a GeoDataframe.
 ---
 
 # FRS-Facilities Skill
 
 ## Description
 
-This skill gets the geometries of FRS facilities in USA by quering SAWGraph knowledge graph on FRINK.
+This skill gets the geometries of FRS facilities in USA by querying SAWGraph knowledge graph on FRINK.
 
 ## When to Use
 
@@ -36,7 +35,7 @@ This skill gets the geometries of FRS facilities in USA by quering SAWGraph know
 
 ### Step 2: Use the following function to get desired FRS facilities
 
-```
+```python
 # Allowed states and NAICS industries
 ALLOWED_STATES = ["Illinois", "Maine", "Ohio"]
 ALLOWED_NAICS = [
