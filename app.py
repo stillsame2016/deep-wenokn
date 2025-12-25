@@ -545,7 +545,8 @@ Available skills: {', '.join(skills_list) if skills_list else 'None found'}
 
 **User Temp Directory:** {st.session_state.temp_dir}
 
-**Use this path in your shell commands to run Python script:** {sys.executable}
+## Important Notes:
+- When you need to run Python via shell, always use {sys.executable} -c "....." 
 """
             
             # Create the agent WITHOUT checkpointer
