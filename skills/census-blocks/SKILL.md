@@ -1,9 +1,9 @@
 ---
-name: cenusus-blocks
+name: census-blocks
 description:  Use this skill for the requests related to USA census blocks; it provides a way to get blocks as a GeoDataframe in GeoPandas
 ---
 
-# Cenusus-Blocks Skill
+# Census-Blocks Skill
 
 ## Description
 
