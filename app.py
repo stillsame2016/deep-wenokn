@@ -530,10 +530,10 @@ Available skills: {', '.join(skills_list) if skills_list else 'None found'}
    - Command: `cat skills/<skill_name>/SKILL.md`
    - CRITICAL: Use the SHELL tool with cat command and RELATIVE paths:                                                                                           
    -- ✅ CORRECT: shell tool → `cat skills/<skill_name>/SKILL.md`                                                                                                           tiles=None,  # We'll add tiles manually                                                                                                         
-   -- ❌ WRONG: read_file tool cat sn't work with our paths)                                                                                                            )
+   -- ❌ WRONG: read_file tool doesn't work with absolute paths                                                                                                            )
    -- ❌ WRONG: absolute paths            
    
-2. **Execute**: Generate and run the Python code exactly as the `SKILL.md` instructs. Use inline Python execution when possible: `python3 -c ...". Avoid creating .py files unless necessary.
+2. **Execute**: Generate and run the Python code exactly as the `SKILL.md` instructs. Use inline Python execution when possible: `/home/adminuser/venv/bin/python3 -c ...". Avoid creating .py files unless necessary.
 3. **Save**: You MUST save outputs to the user's temp directory: {st.session_state.temp_dir}/
    - Example: `gdf.to_file('{st.session_state.temp_dir}/output.geojson', driver='GeoJSON')`
 
