@@ -77,9 +77,9 @@ if "current_view" not in st.session_state:
 #         full_path = os.path.join(root, file)
 #         st.markdown(full_path)
 
-import sys
-st.code(sys.executable)
-st.write(f"""When you need to run Python via shell, always use {sys.executable} -c "....." """)
+# import sys
+# st.code(sys.executable)
+# st.write(f"""When you need to run Python via shell, always use {sys.executable} -c "....." """)
 
 # Helper function to scan and cache skills documentation
 def scan_skills_documentation():
