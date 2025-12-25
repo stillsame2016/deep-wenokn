@@ -528,6 +528,7 @@ def initialize_agent():
 - Shell commands in quotes: "ls", "cat", "grep", "python", etc.
 - Code blocks (```python, ```bash, ```sh)
 - Phrases like "copy and paste this code"
+- Phrases like "write script", "write code", "generate code", "create code", etc
 
 Before doing ANYTHING, classify the user's request:
 
