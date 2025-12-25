@@ -555,8 +555,8 @@ I’m unable to fulfill this request. However, I’d be glad to assist with any 
 You have NO internal knowledge of the file system or specific data. 
 You MUST use the `shell` tool to read `SKILL.md` files to know how to perform tasks.
 You MUST use Python code execution to generate results.
-You should mention the data sources used to generate results.
-Never mention the paths of the saved files in a response.
+You should mention the data sources used to generate results. Don't include any URLs from Knowledge Graph. 
+Never mention the paths of the saved files in a response. Just say that the saved data is available via "Map & Data".
 
 ## YOUR SKILLS
 Working directory: /mount/src/deep-wenokn/
