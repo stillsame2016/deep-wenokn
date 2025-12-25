@@ -960,7 +960,7 @@ elif st.session_state.current_view == "map":
                             file_name=f"{name}.geojson",
                             mime="application/json",
                             key=f"download_geojson_{name}",
-                            use_container_width=True
+                            width='stretch'
                         )
                     
                     with col2:
@@ -973,19 +973,19 @@ elif st.session_state.current_view == "map":
                             file_name=f"{name}.csv",
                             mime="text/csv",
                             key=f"download_csv_{name}",
-                            use_container_width=True
+                            width='stretch'
                         )
                     
                     with col3:
                         # Delete layer
-                        if st.button("🗑️ Delete", key=f"delete_{name}", use_container_width=True):
+                        if st.button("🗑️ Delete", key=f"delete_{name}", width='stretch'):
                             del st.session_state.geodataframes[name]
                             st.rerun()
                     
                     # Show attribute table (exclude geometry columns)
                     st.markdown("**Attributes:**")
                     display_df = gdf.drop(columns=[col for col in gdf.columns if col.lower() in ['geometry', 'geom', 'the_geom', 'shape']], errors='ignore')
-                    st.dataframe(display_df, use_container_width=True, height=200)
+                    st.dataframe(display_df, width='stretch', height=200)
         
         # ========== DATA TABLES SECTION ==========
         if has_tabledata:
@@ -1012,7 +1012,7 @@ elif st.session_state.current_view == "map":
                             file_name=f"{name}.csv",
                             mime="text/csv",
                             key=f"download_table_{name}",
-                            use_container_width=True
+                            width='stretch'
                         )
                     
                     with col2:
@@ -1028,14 +1028,14 @@ elif st.session_state.current_view == "map":
                                 file_name=f"{name}.xlsx",
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 key=f"download_excel_{name}",
-                                use_container_width=True
+                                width='stretch'
                             )
                         except ImportError:
                             st.caption("(openpyxl not installed)")
                     
                     with col3:
                         # Delete table
-                        if st.button("🗑️ Delete", key=f"delete_table_{name}", use_container_width=True):
+                        if st.button("🗑️ Delete", key=f"delete_table_{name}", width='stretch'):
                             del st.session_state.dataframes[name]
                             st.rerun()
                     
@@ -1057,7 +1057,7 @@ elif st.session_state.current_view == "map":
                     st.markdown("**Data Preview:**")
                     st.dataframe(
                         df,
-                        use_container_width=True,
+                        width='stretch',
                         height=min(400, len(df) * 35 + 38)  # Dynamic height based on rows
                     )
                     
@@ -1069,5 +1069,5 @@ elif st.session_state.current_view == "map":
                     #         'Non-Null': df.notna().sum(),
                     #         'Null': df.isna().sum()
                     #     })
-                    #     st.dataframe(col_info, use_container_width=True, hide_index=True)
+                    #     st.dataframe(col_info, width='stretch', hide_index=True)
 
