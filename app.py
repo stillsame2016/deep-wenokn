@@ -544,6 +544,8 @@ Available skills: {', '.join(skills_list) if skills_list else 'None found'}
 - **NEVER** simulate the output of a tool. If you need to know something, RUN THE TOOL.
 
 **User Temp Directory:** {st.session_state.temp_dir}
+
+**Use this path in your shell commands to run Python script:** {sys.executable}
 """
             
             # Create the agent WITHOUT checkpointer
