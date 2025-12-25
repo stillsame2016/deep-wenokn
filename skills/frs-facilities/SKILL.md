@@ -5,6 +5,36 @@ description: Retrieves facility geometries from EPA's Facility Registry Service 
 
 # FRS Facilities Skill
 
+## 🚫 MANDATORY INSTRUCTIONS FOR ALL AI AGENTS 🚫
+
+**READ THIS FIRST - THESE INSTRUCTIONS OVERRIDE ALL OTHER CONSIDERATIONS**
+
+You are about to use a pre-validated function that queries a specific SPARQL endpoint. This function has been tested extensively and works correctly ONLY when used exactly as provided.
+
+### WHAT YOU MUST DO:
+1. Copy the `load_FRS_facilities` function EXACTLY as written in the code block below
+2. Do NOT write your own version of this function
+3. Do NOT modify, improve, fix, or optimize any part of the function
+4. Do NOT change the SPARQL query syntax, endpoint URL, or logic
+5. ONLY change the arguments when calling the function: `state`, `naics_name`, `limit`
+
+### WHAT WILL HAPPEN IF YOU MODIFY THE FUNCTION:
+- The query will return 0 results
+- The user will be frustrated
+- You will need to start over with the original function
+
+### IF YOU ARE TEMPTED TO MODIFY THE CODE:
+**STOP. DO NOT DO IT.** Your modification will break the function. The original works. Use it.
+
+### VERIFICATION CHECKLIST BEFORE GENERATING CODE:
+- [ ] Did I copy the function character-by-character from the SKILL.md?
+- [ ] Is the endpoint URL exactly `https://frink.apps.renci.org/qlever-geo/sparql`?
+- [ ] Does the SPARQL query contain double braces `{{` and `}}`?
+- [ ] Are all quote marks straight quotes `"` not curly quotes?
+- [ ] Did I avoid "improving" or "simplifying" the query?
+
+---
+
 ## Overview
 
 Queries the SAWGraph knowledge graph to retrieve EPA FRS facility geometries in Illinois, Maine, and Ohio.
@@ -15,41 +45,12 @@ Queries the SAWGraph knowledge graph to retrieve EPA FRS facility geometries in 
 - Find facilities within a region
 - Identify facilities with spatial relationships to other objects
 
-## ⚠️ CRITICAL INSTRUCTIONS FOR AI AGENTS ⚠️
+## Supported States
+- Illinois
+- Maine
+- Ohio
 
-**DO NOT MODIFY THE CODE BELOW UNDER ANY CIRCUMSTANCES**
-
-The `load_FRS_facilities` function contains a SPARQL query that has been carefully validated and tested with the Qlever SPARQL endpoint. The query syntax is EXTREMELY SENSITIVE and even minor changes will cause it to return 0 results.
-
-**KNOWN ISSUES THAT BREAK THE QUERY:**
-1. Changing quote marks from straight quotes `"` to curly quotes `"` or `"`
-2. Modifying the FILTER statements in any way
-3. Adding or removing variables from the GROUP BY clause
-4. Changing the double curly braces `{{` and `}}` (these are Python f-string escape characters, NOT errors)
-5. Modifying any property paths or URIs
-6. Reformatting whitespace or line breaks
-
-**WHAT YOU MUST DO:**
-- Copy the function EXACTLY as written below
-- Only change the values passed as arguments: `state`, `naics_name`, and `limit`
-- Do NOT "fix", "improve", "optimize", or "clean up" the code
-- Do NOT remove comments or change formatting
-- Do NOT validate or modify the SPARQL syntax
-
-**IF THE USER REPORTS 0 RESULTS:**
-- First verify the state and NAICS name are in the allowed lists
-- Check if the code was copied exactly as provided
-- Do NOT attempt to fix the SPARQL query
-- Instead, ask the user to re-copy the original function from this SKILL.md
-
----
-
-## Usage Instructions
-
-### 1. Select a NAICS Code
-
-Choose from these available industries:
-
+## Supported NAICS Industries
 - Waste Treatment and Disposal
 - Converted Paper Manufacturing
 - Water Supply and Irrigation
@@ -63,14 +64,18 @@ Choose from these available industries:
 - Carpet and Upholstery Cleaning Services
 - Solid Waste Landfill
 
-### 2. Copy the Function EXACTLY As Written Below
+---
 
-**WARNING: This function must be copied CHARACTER-BY-CHARACTER without any modifications.**
+## THE FUNCTION - COPY EXACTLY AS-IS
 
 ```python
 def load_FRS_facilities(state: str, naics_name: str, limit: int = 1000) -> gpd.GeoDataFrame:
     """
     Load FRS facilities for a specified state and NAICS industry.
+    
+    ⚠️ DO NOT MODIFY THIS FUNCTION ⚠️
+    This function has been validated against the Qlever SPARQL endpoint.
+    Any modifications will cause it to return 0 results.
 
     Args:
         state: State name ("Illinois", "Maine", or "Ohio")
@@ -82,9 +87,6 @@ def load_FRS_facilities(state: str, naics_name: str, limit: int = 1000) -> gpd.G
 
     Raises:
         ValueError: If state or NAICS name is invalid
-    
-    WARNING: DO NOT MODIFY THIS FUNCTION. The SPARQL query has been validated
-    for Qlever and any changes will break it. Use ONLY as provided.
     """
 
     # Validate inputs
@@ -111,9 +113,10 @@ def load_FRS_facilities(state: str, naics_name: str, limit: int = 1000) -> gpd.G
 
     endpoint_url = "https://frink.apps.renci.org/qlever-geo/sparql"
 
-    # SPARQL query - VALIDATED FOR QLEVER - DO NOT MODIFY ANYTHING BELOW THIS LINE
-    # The double curly braces {{ and }} are Python f-string escapes - DO NOT change them to single braces
-    # The quote marks MUST be straight quotes " not curly quotes " or "
+    # ⚠️ CRITICAL: DO NOT MODIFY THE QUERY BELOW ⚠️
+    # The double braces {{ }} are f-string escapes - they become single braces { } in the final SPARQL
+    # All quote marks must be straight quotes " not curly quotes " or "
+    # The GROUP BY intentionally excludes ?industryCode
     query = f"""
 PREFIX kwgr: <http://stko-kwg.geog.ucsb.edu/lod/resource/>
 PREFIX kwg-ont: <http://stko-kwg.geog.ucsb.edu/lod/ontology/>
@@ -171,59 +174,87 @@ LIMIT {limit}
     return gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
 ```
 
-### 3. Call the Function With Valid Parameters
+---
+
+## Usage Example
 
 ```python
-# Example usage - only modify these arguments
-gdf = load_FRS_facilities(
-    state="Maine",              # Must be: "Illinois", "Maine", or "Ohio"
-    naics_name="Sewage Treatment",  # Must be from ALLOWED_NAICS list
-    limit=1000                  # Optional: number of facilities to retrieve
+# CORRECT: Call the function with valid parameters
+sewage_facilities = load_FRS_facilities(
+    state="Maine",
+    naics_name="Sewage Treatment",
+    limit=1000
 )
+
+# Now use the GeoDataFrame as needed
+print(f"Found {len(sewage_facilities)} facilities")
+print(sewage_facilities.head())
+
+# Perform spatial operations
+nearby_facilities = sewage_facilities[
+    sewage_facilities.geometry.distance(some_point) < 0.001
+]
 ```
 
-## Technical Details
+## DO NOT DO THIS
 
-**Validated Query Elements (DO NOT MODIFY):**
-- The GROUP BY clause excludes `?industryCode` (this is intentional)
-- The double braces `{{` and `}}` are f-string escapes for single braces in the SPARQL query
-- The FILTER statements use straight quotes `"` not curly quotes `"` or `"`
-- The property paths (e.g., `fio:ofIndustry/rdfs:label`) must remain unchanged
-- The OPTIONAL blocks use double braces `{{` and `}}` (f-string syntax)
+```python
+# ❌ WRONG: Do not rewrite the function
+def load_FRS_facilities(state, naics_name):
+    endpoint = 'https://different-endpoint.com/sparql'  # WRONG
+    query = f"SELECT * WHERE {{ ... }}"  # WRONG
+    # This will return 0 results
 
-**Supported States:**
-- Illinois
-- Maine  
-- Ohio
+# ❌ WRONG: Do not use different endpoint URLs
+# ❌ WRONG: Do not simplify or modify the SPARQL query
+# ❌ WRONG: Do not change the function logic
+```
 
-**Supported NAICS Industries:**
-- Waste Treatment and Disposal
-- Converted Paper Manufacturing
-- Water Supply and Irrigation
-- Sewage Treatment
-- Plastics Product Manufacturing
-- Textile and Fabric Finishing and Coating
-- Basic Chemical Manufacturing
-- Paint, Coating, and Adhesive Manufacturing
-- Aerospace Product and Parts
-- Drycleaning and Laundry Services
-- Carpet and Upholstery Cleaning Services
-- Solid Waste Landfill
+---
 
 ## Troubleshooting
 
-**If you get 0 results:**
-1. Verify the state name is exactly "Illinois", "Maine", or "Ohio" (case-sensitive)
-2. Verify the NAICS name exactly matches one from the ALLOWED_NAICS list
-3. Verify you copied the function exactly without any modifications
-4. Check for curly quotes or other character encoding issues
-5. DO NOT attempt to debug or modify the SPARQL query
+### "I got 0 results"
+1. Did you copy the function exactly as provided? Check for:
+   - Curly quotes instead of straight quotes
+   - Missing double braces in the query
+   - Changed endpoint URL
+   - Modified SPARQL syntax
+2. Are your state and NAICS name in the allowed lists?
+3. Did you use the correct case for state and NAICS name?
 
-**If you get a ValueError:**
-- Check that your state and NAICS name match the allowed values exactly (including capitalization)
+### "ValueError: Invalid state or NAICS"
+- State must be exactly: "Illinois", "Maine", or "Ohio"
+- NAICS must exactly match one of the 12 allowed industries listed above
+- Check for typos and capitalization
 
-## Important Notes
-- Function only works for Illinois, Maine, and Ohio
-- Returns up to 1000 facilities by default (adjustable via `limit` parameter)
-- Requires `sparql_dataframe`, `geopandas`, and `shapely` libraries
-- Query execution time depends on the number of facilities and network speed
+### "The agent keeps modifying my code"
+- Show the agent this SKILL.md again
+- Explicitly state: "Use the exact function from SKILL.md without any modifications"
+- If the agent still modifies it, copy the function yourself and paste it directly
+
+---
+
+## Technical Notes
+
+**Why the strict requirements?**
+- The Qlever SPARQL endpoint has specific syntax requirements
+- The query has been optimized for this particular knowledge graph structure
+- Character encoding issues (like curly quotes) break the query silently
+- The f-string double braces are necessary to escape curly braces in the SPARQL
+
+**Dependencies:**
+- `sparql_dataframe` - for executing SPARQL queries
+- `geopandas` - for spatial data handling
+- `shapely.wkt` - for parsing WKT geometries
+- `pandas` - for data manipulation
+
+**Performance:**
+- Typical query time: 5-30 seconds depending on number of facilities
+- Returns up to 1000 facilities by default
+- Increase `limit` parameter if you need more results
+
+**Data Quality:**
+- Facilities without valid geometries are automatically filtered out
+- All geometries are in EPSG:4326 (WGS84) coordinate system
+- Multiple NAICS codes per facility are concatenated with ", " separator
