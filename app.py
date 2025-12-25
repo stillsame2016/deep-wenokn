@@ -546,7 +546,7 @@ Available skills: {', '.join(skills_list) if skills_list else 'None found'}
 **User Temp Directory:** {st.session_state.temp_dir}
 
 ## Important Notes:
-- When you need to run Python via shell, always use {sys.executable} -c "....." 
+- We have a virtual environment at /home/adminuser/venv created by uv.
 """
             
             # Create the agent WITHOUT checkpointer
