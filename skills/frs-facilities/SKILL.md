@@ -53,6 +53,7 @@ ALLOWED_NAICS = [
     "Solid Waste Landfill",
 ]
 
+# Keep the following function as it is. Any change may break it. Especially the SPARQL is validated for Qlever
 def load_FRS_facilities(state: str, naics_name: str, limit: int = 1000) -> gpd.GeoDataFrame:
     """
     Load facilities from the FRS dataset for a given state and NAICS industry name.
