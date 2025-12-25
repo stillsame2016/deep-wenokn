@@ -881,11 +881,11 @@ with st.sidebar:
     # Navigation buttons
     # col1, col2 = st.columns(2)
     # with col1:
-    if st.button("Conversation", use_container_width=True, type="primary" if st.session_state.current_view == "conversation" else "secondary"):
+    if st.button("Conversation", width='stretch', type="primary" if st.session_state.current_view == "conversation" else "secondary"):
         st.session_state.current_view = "conversation"
         st.rerun()
     # with col2:
-    if st.button("Map & Data", use_container_width=True, type="primary" if st.session_state.current_view == "map" else "secondary"):
+    if st.button("Map & Data", width='stretch', type="primary" if st.session_state.current_view == "map" else "secondary"):
         st.session_state.current_view = "map"
         st.rerun()
     
@@ -895,7 +895,7 @@ with st.sidebar:
     # num_layers = len(st.session_state.geodataframes)
     # st.markdown(f"**Map Layers:** {num_layers}")
     
-    if st.button("Clear All Data", use_container_width=True):
+    if st.button("Clear All Data", width='stretch'):
         st.session_state.geodataframes = {}
         st.session_state.dataframes = {}
         st.session_state.generated_code = []
