@@ -34,26 +34,9 @@ Choose from these available industries:
 - Carpet and Upholstery Cleaning Services
 - Solid Waste Landfill
 
-### 2. Use the Query Function
+### 2. Use the Following Function load_FRS_facilities Without Any Changes
 
 ```python
-# Configuration
-ALLOWED_STATES = ["Illinois", "Maine", "Ohio"]
-ALLOWED_NAICS = [
-    "Waste Treatment and Disposal",
-    "Converted Paper Manufacturing",
-    "Water Supply and Irrigation",
-    "Sewage Treatment",
-    "Plastics Product Manufacturing",
-    "Textile and Fabric Finishing and Coating",
-    "Basic Chemical Manufacturing",
-    "Paint, Coating, and Adhesive Manufacturing",
-    "Aerospace Product and Parts",
-    "Drycleaning and Laundry Services",
-    "Carpet and Upholstery Cleaning Services",
-    "Solid Waste Landfill",
-]
-
 def load_FRS_facilities(state: str, naics_name: str, limit: int = 1000) -> gpd.GeoDataFrame:
     """
     Load FRS facilities for a specified state and NAICS industry.
@@ -71,6 +54,22 @@ def load_FRS_facilities(state: str, naics_name: str, limit: int = 1000) -> gpd.G
     """
 
     # Validate inputs
+    ALLOWED_STATES = ["Illinois", "Maine", "Ohio"]
+    ALLOWED_NAICS = [
+        "Waste Treatment and Disposal",
+        "Converted Paper Manufacturing",
+        "Water Supply and Irrigation",
+        "Sewage Treatment",
+        "Plastics Product Manufacturing",
+        "Textile and Fabric Finishing and Coating",
+        "Basic Chemical Manufacturing",
+        "Paint, Coating, and Adhesive Manufacturing",
+        "Aerospace Product and Parts",
+        "Drycleaning and Laundry Services",
+        "Carpet and Upholstery Cleaning Services",
+        "Solid Waste Landfill",
+    ]
+
     if state not in ALLOWED_STATES:
         raise ValueError(f"Invalid state '{state}'. Allowed: {ALLOWED_STATES}")
     if naics_name not in ALLOWED_NAICS:
@@ -136,7 +135,12 @@ LIMIT {limit}
     return gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
 ```
 
+## Critical
+- The following conditions used in the SPARQL are critical. Please keep them as they are
+    FILTER(CONTAINS(LCASE(?stateName), "{state.lower()}"))
+    FILTER(CONTAINS(LCASE(?industryCode), "{naics_name.lower()}"))
+
 ## Important Notes
-- Do not modify the SPARQL query defined in the function load_FRS_facilities; it's validated for Qlever. Any changes would make it longer working.
+- Do not change the function load_FRS_facilities; it's validated for Qlever. Any changes may break its function.
 - Function only works for Illinois, Maine, and Ohio
 - Returns up to 1000 facilities by default (adjustable via `limit` parameter)
