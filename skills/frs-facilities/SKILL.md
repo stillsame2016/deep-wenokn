@@ -34,7 +34,7 @@ Choose from these available industries:
 - Carpet and Upholstery Cleaning Services
 - Solid Waste Landfill
 
-### 2. Use the Following Function load_FRS_facilities Without Any Changes
+### 2. Cut and Paste the Following Function load_FRS_facilities 
 
 ```python
 def load_FRS_facilities(state: str, naics_name: str, limit: int = 1000) -> gpd.GeoDataFrame:
