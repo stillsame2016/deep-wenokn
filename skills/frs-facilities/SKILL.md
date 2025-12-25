@@ -137,7 +137,6 @@ LIMIT {limit}
 ```
 
 ## Important Notes
-
-- Do not modify the SPARQL query; it's validated for Qlever
+- Do not modify the SPARQL query defined in the function load_FRS_facilities; it's validated for Qlever. Any changes would make it longer working.
 - Function only works for Illinois, Maine, and Ohio
 - Returns up to 1000 facilities by default (adjustable via `limit` parameter)
