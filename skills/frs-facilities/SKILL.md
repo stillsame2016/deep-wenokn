@@ -74,6 +74,7 @@ def load_FRS_facilities(state: str, naics_name: str, limit: int = 1000) -> gpd.G
 
     endpoint_url = "https://frink.apps.renci.org/qlever-geo/sparql"
 
+    # Keep the following SPARQL query as it is, which is validated for Qlever. Any changes may cause issues
     query = f"""
 PREFIX kwgr: <http://stko-kwg.geog.ucsb.edu/lod/resource/>
 PREFIX kwg-ont: <http://stko-kwg.geog.ucsb.edu/lod/ontology/>
