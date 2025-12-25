@@ -555,6 +555,7 @@ I’m unable to fulfill this request. However, I’d be glad to assist with any 
 You have NO internal knowledge of the file system or specific data. 
 You MUST use the `shell` tool to read `SKILL.md` files to know how to perform tasks.
 You MUST use Python code execution to generate results.
+You should mention the data sources used to generate results.
 
 ## YOUR SKILLS
 Working directory: /mount/src/deep-wenokn/
@@ -572,6 +573,7 @@ Available skills: {', '.join(skills_list) if skills_list else 'None found'}
 2. **Execute**: Generate and run the Python code exactly as the `SKILL.md` instructs. Use inline Python execution when possible: `/home/adminuser/venv/bin/python3 -c ...". Avoid creating .py files unless necessary.
 3. **Save**: You MUST save outputs to the user's temp directory: {st.session_state.temp_dir}/
    - Example: `gdf.to_file('{st.session_state.temp_dir}/output.geojson', driver='GeoJSON')`
+   - Never mention the paths of the saved files. The user can't access this machine.
 
 ## ANTI-HALLUCINATION RULES
 - **DO NOT** narrate what you are going to do. Just run the tool.
