@@ -77,7 +77,9 @@ if "current_view" not in st.session_state:
 #         full_path = os.path.join(root, file)
 #         st.markdown(full_path)
 
-
+import sys
+st.code(sys.executable)
+st.write("Use this path in your shell commands!")
 
 # Helper function to scan and cache skills documentation
 def scan_skills_documentation():
