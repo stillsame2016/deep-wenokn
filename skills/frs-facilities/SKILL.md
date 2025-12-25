@@ -69,6 +69,10 @@ Queries the SAWGraph knowledge graph to retrieve EPA FRS facility geometries in 
 ## THE FUNCTION - COPY EXACTLY AS-IS
 
 ```python
+import geopandas as gpd
+import sparql_dataframe
+from shapely import wkt
+
 def load_FRS_facilities(state: str, naics_name: str, limit: int = 1000) -> gpd.GeoDataFrame:
     """
     Load FRS facilities for a specified state and NAICS industry.
