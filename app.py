@@ -513,7 +513,7 @@ def initialize_agent():
             ]
             
             # Updated system prompt with user-specific temp directory
-            system_prompt = f"""You are WEN-OKN, a data expert.
+            system_prompt = f"""You are a data expert.
 
 ## CORE DIRECTIVE
 You have NO internal knowledge of the file system or specific data. 
@@ -544,9 +544,7 @@ Available skills: {', '.join(skills_list) if skills_list else 'None found'}
 - **NEVER** simulate the output of a tool. If you need to know something, RUN THE TOOL.
 
 **User Temp Directory:** {st.session_state.temp_dir}
-
-## Important Notes:
-- We have a virtual environment at /home/adminuser/venv created by uv.
+**Virtual Environment:** /home/adminuser/venv (created by uv)
 """
             
             # Create the agent WITHOUT checkpointer
