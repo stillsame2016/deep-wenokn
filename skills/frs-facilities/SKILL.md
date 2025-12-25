@@ -1,42 +1,43 @@
 ---
 name: frs-facilities
-description: Use this skill for requests related to the geometry definitions of the facilities listed in EPA's Facility Registry Service (FRS) in Illinois, Maine, and Ohio; it provides a way to get the geometries of FRS facilities as a GeoDataframe.
+description: Retrieves facility geometries from EPA's Facility Registry Service (FRS) for Illinois, Maine, and Ohio as GeoDataFrames
 ---
 
-# FRS-Facilities Skill
+# FRS Facilities Skill
 
-## Description
+## Overview
 
-This skill gets the geometries of FRS facilities in USA by querying SAWGraph knowledge graph on FRINK.
+Queries the SAWGraph knowledge graph to retrieve EPA FRS facility geometries in Illinois, Maine, and Ohio.
 
-## When to Use
+## Use Cases
 
-- Find a FRS facility by name
-- Find FRS facilities within a region
-- Find FRS facilities with spatial relation with other objects
+- Search for facilities by name
+- Find facilities within a region
+- Identify facilities with spatial relationships to other objects
 
-## How to Use
+## Usage Instructions
 
-### Step 1: Choose one NAICS code from the following list:
+### 1. Select a NAICS Code
 
-    Waste Treatment and Disposal,
-    Converted Paper Manufacturing,
-    Water Supply and Irrigation,
-    Sewage Treatment,
-    Plastics Product Manufacturing,
-    Textile and Fabric Finishing and Coating,
-    Basic Chemical Manufacturing,
-    Paint, Coating, and Adhesive Manufacturing,
-    Aerospace Product and Parts,
-    Drycleaning and Laundry Services,
-    Carpet and Upholstery Cleaning Services,
-    Solid Waste Landfill,
+Choose from these available industries:
 
+- Waste Treatment and Disposal
+- Converted Paper Manufacturing
+- Water Supply and Irrigation
+- Sewage Treatment
+- Plastics Product Manufacturing
+- Textile and Fabric Finishing and Coating
+- Basic Chemical Manufacturing
+- Paint, Coating, and Adhesive Manufacturing
+- Aerospace Product and Parts
+- Drycleaning and Laundry Services
+- Carpet and Upholstery Cleaning Services
+- Solid Waste Landfill
 
-### Step 2: Use the following function to get desired FRS facilities
+### 2. Use the Query Function
 
 ```python
-# Allowed states and NAICS industries
+# Configuration
 ALLOWED_STATES = ["Illinois", "Maine", "Ohio"]
 ALLOWED_NAICS = [
     "Waste Treatment and Disposal",
@@ -53,29 +54,31 @@ ALLOWED_NAICS = [
     "Solid Waste Landfill",
 ]
 
-# Keep the following function as it is. Any change may break it. Especially the SPARQL is validated for Qlever
 def load_FRS_facilities(state: str, naics_name: str, limit: int = 1000) -> gpd.GeoDataFrame:
     """
-    Load facilities from the FRS dataset for a given state and NAICS industry name.
+    Load FRS facilities for a specified state and NAICS industry.
 
-    Parameters:
-        state (str): State name, e.g., "Illinois", "Maine", "Ohio".
-        naics_name (str): NAICS industry name, e.g., "Waste Treatment and Disposal".
-        limit (int): Maximum number of facilities to fetch (default 1000).
+    Args:
+        state: State name ("Illinois", "Maine", or "Ohio")
+        naics_name: NAICS industry name from ALLOWED_NAICS list
+        limit: Maximum facilities to retrieve (default: 1000)
 
     Returns:
-        gpd.GeoDataFrame: Facilities with geometry and other attributes.
+        GeoDataFrame with facility geometries and attributes
+
+    Raises:
+        ValueError: If state or NAICS name is invalid
     """
 
-    # Validate parameters
+    # Validate inputs
     if state not in ALLOWED_STATES:
-        raise ValueError(f"Invalid state '{state}'. Allowed states: {ALLOWED_STATES}")
+        raise ValueError(f"Invalid state '{state}'. Allowed: {ALLOWED_STATES}")
     if naics_name not in ALLOWED_NAICS:
-        raise ValueError(f"Invalid NAICS name '{naics_name}'. Allowed values: {ALLOWED_NAICS}")
+        raise ValueError(f"Invalid NAICS '{naics_name}'. Allowed: {ALLOWED_NAICS}")
 
     endpoint_url = "https://frink.apps.renci.org/qlever-geo/sparql"
 
-    # Keep the following SPARQL query as it is, which is validated for Qlever. Any changes may cause issues
+    # SPARQL query (validated for Qlever - do not modify)
     query = f"""
 PREFIX kwgr: <http://stko-kwg.geog.ucsb.edu/lod/resource/>
 PREFIX kwg-ont: <http://stko-kwg.geog.ucsb.edu/lod/ontology/>
@@ -123,16 +126,18 @@ WHERE {{
 GROUP BY ?facility ?facilityName ?facilityWKT ?countyName ?stateName ?industryCode ?frsId ?triId ?rcraId ?airId ?npdesId
 LIMIT {limit}
 """    
-    # Fetch data
+    # Execute query and process results
     df = sparql_dataframe.get(endpoint_url, query)
-
-    # Convert WKT to geometry
     df = df.dropna(subset=["facilityWKT"]).copy()
     df["geometry"] = df["facilityWKT"].apply(wkt.loads)
     df = df.drop(columns=["facilityWKT"])
 
-    # Convert to GeoDataFrame
-    gdf = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
-    # gdf = gdf.drop_duplicates(subset='geometry')  
-    return gdf
+    # Return as GeoDataFrame
+    return gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
 ```
+
+## Important Notes
+
+- Do not modify the SPARQL query; it's validated for Qlever
+- Function only works for Illinois, Maine, and Ohio
+- Returns up to 1000 facilities by default (adjustable via `limit` parameter)
