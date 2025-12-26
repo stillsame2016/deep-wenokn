@@ -954,7 +954,7 @@ if st.session_state.current_view == "sample":
     st.markdown("#### States, Counties and Rivers")
     st.markdown("""
 * Find the state of Utah.
-* Find all states that border Utah.
+* Find all neighboring states of Utah.
 * Find the Ohio River.
 * Find all states that the Ohio River flows through.
                 """)
