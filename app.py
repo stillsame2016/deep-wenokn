@@ -955,8 +955,8 @@ if st.session_state.current_view == "sample":
     st.markdown("""
 * Find the state of Utah.
 * Find all neighboring states of Utah.
-* Find the Ohio River.
-* Find all states that the Ohio River flows through.
+* Find the Ohio River and all states that the Ohio River flows through.
+* Find the Scioto River and its downstream counties of Ross county.
                 """)
 
 elif st.session_state.current_view == "map":
