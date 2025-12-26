@@ -963,8 +963,8 @@ if st.session_state.current_view == "sample":
                 """)
     st.markdown("#### Dams, Coal Mines and Power Plants")
     st.markdown("""
-* Find all dams on the Muskingum River.
 * Find all dams in Ross County.
+* Find all dams on the Muskingum River.
 * Find all coal mines within 1,000 meters of the Ohio River.
 * Find the coal mine closest to the Ohio River.
                 """)
