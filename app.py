@@ -975,9 +975,11 @@ if st.session_state.current_view == "sample":
                 """)
     st.markdown("#### Hydrologic Basins, Watersheds, and Stream Gages")
     st.markdown("""
-* Find all basins through which the Scioto River flows.
-* Find all rivers that flow through the Roanoke Basin.
-* Find all watersheds within the Kanawha Basin.
+                * Find all hydrological basins that intersect the state of Ohio.
+                * Find all counties that intersect the Lower Ohio–Salt Basin.
+                * Find all basins through which the Scioto River flows.
+                * Find all rivers that flow through the Roanoke Basin.
+                * Find all watersheds within the Kanawha Basin.
                 """)
 elif st.session_state.current_view == "map":
     
