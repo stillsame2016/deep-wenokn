@@ -953,9 +953,10 @@ if st.session_state.current_view == "sample":
 
     st.markdown("#### States, Counties and Rivers")
     st.markdown("""
-                *   Item 1
-                *   Item 2
-                *   Item 3
+                *   Find Utah State
+                *   Find all neighboring states of Utah State
+                *   Find Ohio river
+                *   Find all states that Ohio river flows through
                 """)
 
 elif st.session_state.current_view == "map":
