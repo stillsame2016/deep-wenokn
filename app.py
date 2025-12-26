@@ -947,6 +947,12 @@ if st.session_state.current_view == "conversation":
     if user_input:
         handle_user_input(user_input)
 
+if st.session_state.current_view == "sample":
+    # Sample Queries View
+    st.markdown("### Sample Queries")
+
+    st.markdown("#### States, Counties and Rivers")
+
 elif st.session_state.current_view == "map":
     
     # Check if we have any data at all
