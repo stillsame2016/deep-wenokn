@@ -953,13 +953,20 @@ if st.session_state.current_view == "sample":
 
     st.markdown("#### States, Counties and Rivers")
     st.markdown("""
-* Find the state of Utah.
-* Find all states that border Utah.
-* Find the Ohio River and all states through which the Ohio River flows.
-* Find the Scioto River and all downstream counties from Ross County.
-* Find Los Angeles County and all rivers that flow through it.
-* Find all rivers that flow through Arizona with a length greater than 100 km. 
-* For each county in Ohio, find the longest river that flows through it and save these rivers as GeoJSON.
+                * Find the state of Utah.
+                * Find all states that border Utah.
+                * Find the Ohio River and all states through which the Ohio River flows.
+                * Find the Scioto River and all downstream counties from Ross County.
+                * Find Los Angeles County and all rivers that flow through it.
+                * Find all rivers that flow through Arizona with a length greater than 100 km. 
+                * For each county in Ohio, find the longest river that flows through it and save these rivers as GeoJSON.
+                """)
+    st.markdown("#### Dams, Coal Mines and Power Plants")
+    st.markdown("""
+* A
+* B
+* C
+* D
                 """)
 
 elif st.session_state.current_view == "map":
