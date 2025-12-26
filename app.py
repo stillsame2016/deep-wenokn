@@ -963,10 +963,12 @@ if st.session_state.current_view == "sample":
                 """)
     st.markdown("#### Dams, Coal Mines and Power Plants")
     st.markdown("""
-* Find all dams in Ross County.
-* Find the Muskingum River and all dams on it.
-* Find all coal mines within 1,000 meters of the Ohio River.
-* Find the coal mine closest to the Ohio River.
+                * Find all dams in Ross County.
+                * Find the Muskingum River and all dams on it.
+                * Find all coal mines within 1,000 meters of the Ohio River.
+                * Find the coal mine closest to the Ohio River.
+                * Find all solar power plants in Kentucky.
+                * Compare the energy usage of power plants in California and Ohio and generate a professional report.
                 """)
 
 elif st.session_state.current_view == "map":
