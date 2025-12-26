@@ -567,7 +567,7 @@ Available skills: {', '.join(skills_list) if skills_list else 'None found'}
    - Command: `cat skills/<skill_name>/SKILL.md`
    - CRITICAL: Use the SHELL tool with cat command and RELATIVE paths:                                                                                           
    -- ✅ CORRECT: shell tool → `cat skills/<skill_name>/SKILL.md`                                                                                                           tiles=None,  # We'll add tiles manually                                                                                                         
-   -- ❌ WRONG: read_file tool doesn't work with absolute paths                                                                                                            )
+   -- ❌ WRONG: read_file tool doesn't work with absolute paths. Please use "tail -n +N file" to get the content from Lines N                                                                                                         )
    -- ❌ WRONG: absolute paths            
    
 2. **Execute**: Generate and run the Python code exactly as the `SKILL.md` instructs. Use inline Python execution when possible: `/home/adminuser/venv/bin/python3 -c ...". Avoid creating .py files unless necessary.
