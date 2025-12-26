@@ -7,7 +7,7 @@ description: Use this skill for the requests related to the geometry definitions
 
 ## Description
 
-This skill gets the geometries of rivers in USA by quering GeoConnex knowledge graph on FRINK using their names. Please note that FRINK is impelmented by Qlever. Qlever doesn't support querying by a bounding box, i.e., you can't query all rivers within a bounding box.
+This skill gets the geometries of rivers in USA by quering GeoConnex knowledge graph on FRINK using their names. 
 
 ## When to Use
 
@@ -245,4 +245,4 @@ LIMIT 200
 ## Notes 
 
 - To find all downstream/upstream counties of a river starting from a specific object near the river, first identify all counties that the river flows through using the Example 2 above, and then determine which of those counties are downstream/upstream.
-- Unless explicitly stated, do not assume FRINK contains other types of data.   
+- **Critical**： Any functions not appearing in the example SPARQL queries do not exist in FRINK. FRINK is implemented on top of Qlevel; Qlevel provides only very limited geospatial support. Do not attempt to use any other functions not shown in the examples.
