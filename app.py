@@ -952,7 +952,7 @@ if st.session_state.current_view == "sample":
     st.markdown("### Sample Queries")
 
     st.markdown("#### States, Counties and Rivers")
-    st.markdown("-- Find Utah State")
+    st.markdown("- Find Utah State")
 
 elif st.session_state.current_view == "map":
     
