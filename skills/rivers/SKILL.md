@@ -7,7 +7,7 @@ description: Use this skill for the requests related to the geometry definitions
 
 ## Description
 
-This skill gets the geometries of rivers in USA by quering GeoConnex knowledge graph on FRINK using their names.
+This skill gets the geometries of rivers in USA by quering GeoConnex knowledge graph on FRINK using their names. Please note that FRINK is impelmented by Qlever. Qlever doesn't support querying by a bounding box, i.e., you can't query all rivers within a bounding box.
 
 ## When to Use
 
