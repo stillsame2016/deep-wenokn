@@ -973,7 +973,12 @@ if st.session_state.current_view == "sample":
                 * Compare the energy usage of power plants in California and Ohio.
                 * Compare the power plants of "Pacific Gas & Electric Co." and "San Diego Gas & Electric Co."
                 """)
-
+    st.markdown("#### Hydrology Basins, Watersheds and Stream Gages")
+    st.markdown("""
+                *  Find all basins through which the Scioto River passes.
+                *  Find all rivers that flow through the Roanoke basin. 
+                *  Find all watersheds in the Kanawha basin. 
+                """)
 elif st.session_state.current_view == "map":
     
     # Check if we have any data at all
