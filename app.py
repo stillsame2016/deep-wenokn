@@ -965,6 +965,7 @@ if st.session_state.current_view == "sample":
     st.markdown("""
                 * Find all dams in Ross County.
                 * Find the Muskingum River and all dams on it.
+                * Find all upstream counties along the Muskingum River, starting from the dam named “Muskingum River Lock and Dam No. 5 – Swift’s No. 5.”.
                 * Find all coal mines within 1,000 meters of the Ohio River.
                 * Find the coal mine closest to the Ohio River.
                 * Find downstream counties of the Ohio River starting from the River View Coal Mine. 
