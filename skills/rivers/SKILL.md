@@ -246,3 +246,4 @@ LIMIT 200
 
 - To find all downstream/upstream counties of a river starting from a specific object near the river, first identify all counties that the river flows through using the Example 2 above, and then determine which of those counties are downstream/upstream.
 - **Critical**： Any functions not appearing in the example SPARQL queries do not exist in FRINK. FRINK is implemented on top of Qlevel; Qlevel provides only very limited geospatial support. Do not attempt to use any other functions not shown in the examples.
+- **Critical**: FRINK/Qlevel doesn't support "<string>^^geo:wktLiteral", i.e. You can't convert a string into a WKT literal.
