@@ -244,4 +244,5 @@ LIMIT 200
                        
 ## Notes 
 
-Unless explicitly stated, do not assume FRINK contains other types of data.   
+- To find all downstream counties of a river starting from a specific object near the river, first identify all counties that the river flows through, and then determine which of those counties are downstream.
+- Unless explicitly stated, do not assume FRINK contains other types of data.   
