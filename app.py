@@ -969,6 +969,7 @@ if st.session_state.current_view == "sample":
                 * Find the coal mine closest to the Ohio River.
                 * Find all solar power plants in Kentucky.
                 * Compare the energy usage of power plants in California and Ohio.
+                * Compare the power plants of "Pacific Gas & Electric Co." and "San Diego Gas & Electric Co."
                 """)
 
 elif st.session_state.current_view == "map":
