@@ -967,7 +967,7 @@ if st.session_state.current_view == "sample":
                 * Find the Muskingum River and all dams on it.
                 * Find all coal mines within 1,000 meters of the Ohio River.
                 * Find the coal mine closest to the Ohio River.
-                * Find all solar power plants in Kentucky.
+                * Find all solar power plants with a total capacity greater than 100 megawatts in Kentucky.
                 * Compare the energy usage of power plants in California and Ohio.
                 * Compare the power plants of "Pacific Gas & Electric Co." and "San Diego Gas & Electric Co."
                 """)
