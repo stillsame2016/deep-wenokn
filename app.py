@@ -968,7 +968,7 @@ if st.session_state.current_view == "sample":
                 * Find all coal mines within 1,000 meters of the Ohio River.
                 * Find the coal mine closest to the Ohio River.
                 * Find all solar power plants in Kentucky.
-                * Compare the energy usage of power plants in California and Ohio and generate a professional report.
+                * Compare the energy usage of power plants in California and Ohio.
                 """)
 
 elif st.session_state.current_view == "map":
