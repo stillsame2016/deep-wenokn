@@ -132,19 +132,19 @@ def get_llm():
     #     }
     # )
 
-    # return ChatOpenAI(
-    #     model="glm-4.6",
-    #     base_url="https://ellm.nrp-nautilus.io/v1",
-    #     api_key=os.environ.get("NRP_API_KEY"),
-    #     temperature=0,
-    # )
-
     return ChatOpenAI(
-        model="glm-4.7",
-        base_url="https://api.z.ai/api/coding/paas/v4",
-        api_key=os.environ.get("ZAI_API_KEY"),
+        model="glm-4.6",
+        base_url="https://ellm.nrp-nautilus.io/v1",
+        api_key=os.environ.get("NRP_API_KEY"),
         temperature=0,
     )
+
+    # return ChatOpenAI(
+    #     model="glm-4.7",
+    #     base_url="https://api.z.ai/api/coding/paas/v4",
+    #     api_key=os.environ.get("ZAI_API_KEY"),
+    #     temperature=0,
+    # )
 
     # return ChatOpenAI(
     #     model="minimax-m2",
