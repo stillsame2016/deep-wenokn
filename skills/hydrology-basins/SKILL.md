@@ -122,11 +122,11 @@ print(f"Found {len(ohio_basins)} basin(s) that intersect Ohio")
 print(ohio_basins[['name', 'huc6', 'states', 'areasqkm']])
 ```
 
-#### Example 3: Find All Rivers Flowing Through a Specific Basin
+#### Example 3: Find All Rivers Flowing Through a Specific Basin (e.g., the “Lower Ohio–Salt” Basin)
 
 - First, locate the basin by name.
-- Then, use its states attribute to obtain the abbreviations of the states in which the basin is located.
-- Next, follow the example from the rivers skill to find all rivers that flow through those states.
+- Then, use its `states` attribute to obtain the abbreviations of the states in which the basin is located. In this example, the `states` attribute of the “Lower Ohio–Salt” Basin has the value `IN,KY`.
+- Next, follow the example in the rivers skill to find all rivers that flow through Indiana and Kentucky. Note that the full state names must be used instead of their abbreviations.
 - Finally, identify which of these rivers intersect the basin.
 
 ## Notes
