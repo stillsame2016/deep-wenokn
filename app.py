@@ -959,6 +959,7 @@ if st.session_state.current_view == "sample":
 * Find the Scioto River and all downstream counties from Ross County.
 * Find Los Angeles County and all rivers that flow through it.
 * Find all rivers that flow through Arizona with a length greater than 100 km. 
+* For each county in Ohio, find the longest river that flows though it.
                 """)
 
 elif st.session_state.current_view == "map":
