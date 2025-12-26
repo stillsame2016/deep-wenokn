@@ -936,7 +936,7 @@ with st.sidebar:
 
 if st.session_state.current_view == "conversation":
     # Conversation View
-    st.markdown("### 💬 Chat with WEN-OKN")
+    st.markdown("### Chat with WEN-OKN")
     
     # Display existing messages
     display_messages()
