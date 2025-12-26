@@ -928,6 +928,10 @@ with st.sidebar:
         os.makedirs(st.session_state.temp_dir)
         st.rerun()
 
+    if st.button("Sample Queries", width='stretch', type="primary" if st.session_state.current_view == "sample" else "secondary"):
+        st.session_state.current_view = "sample"
+        st.rerun()
+
 # ========== MAIN CONTENT AREA ==========
 
 if st.session_state.current_view == "conversation":
