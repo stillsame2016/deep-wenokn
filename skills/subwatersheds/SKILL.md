@@ -121,6 +121,8 @@ where = "states LIKE '%OH%'"
 ohio_subwatersheds = get_features(url, where)
 ```
 
+This query needs more than one minute to complete.
+
 #### Example 3: Find subwatersheds by Partial Name Match
 
 ```python
