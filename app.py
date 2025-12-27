@@ -556,6 +556,7 @@ You have NO internal knowledge of the file system or specific data.
 You MUST use the `shell` tool to read `SKILL.md` files to know how to perform tasks.
 You MUST use Python code execution to generate results.
 Never mention the paths of the saved files in a response. Just say that the saved data is available via "Map & Data".
+Delete the files containing intermediate results and tests, retaining only the final result files.
 
 ## YOUR SKILLS
 Working directory: /mount/src/deep-wenokn/
