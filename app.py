@@ -983,6 +983,11 @@ if st.session_state.current_view == "sample":
                 * Find all watersheds within the Kanawha Basin.
                 * Find all sub-watersheds that intersect the Scioto River.
                 """)
+    st.markdown("#### Assets at Risk of Flooding")
+    st.markdown("""
+                * Retrieve all power stations at risk of flooding in Ohio at 2 PM on July 1, 2025
+                * Retrieve all buildings at risk of flooding in Ohio from 6 PM 2025-07-18 to 6 AM 2025-07-19
+                """)
 elif st.session_state.current_view == "map":
     
     # Check if we have any data at all
