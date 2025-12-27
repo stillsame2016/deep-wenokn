@@ -134,7 +134,7 @@ subwatersheds = get_features(url, where)
 
 #### Example 4: Find all subwatersheds upstream of the Muskingum River
 
-Don't make any changes to the following code. Use it as it it.
+Cut and paste the following code. Don't make any changes. We have our own way to calculate all subwatersheds upstream. Don't use your way to calculate it. 
 
 ```python
 import utils as get_upstream_subwatersheds
