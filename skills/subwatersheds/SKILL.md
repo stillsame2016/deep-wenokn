@@ -134,16 +134,8 @@ subwatersheds = get_features(url, where)
 #### Example 4: Find all subwatersheds upstream of the Muskingum River
 
 ```python
-import geopandas as gpd
-from shapely.geometry import Point
-from shapely.ops import linemerge
-
-river_gdf = ...
-line = linemerge(river_gdf.geometry.values)
-outlet_point = Point(line.coords[-1])
-outlet_gdf = gpd.GeoDataFrame(geometry=[outlet_point], crs=river_gdf.crs)
-
-
+import utils as get_upstream_subwatersheds
+upstream_subwatersheds = get_upstream_subwatersheds(muskingum_river_gdf)
 ```
 
 ## Notes
