@@ -36,7 +36,6 @@ Use this skill to:
 - Find objects within a subwatershed
 - Find subwatersheds that meet specific spatial conditions (e.g., intersecting a county or region)
 - Query subwatersheds by their attributes (huc12 code, area, states, etc.)
-- Find all subwatersheds upstream of a river (See Example 4)
 
 ## How to Use
 
@@ -130,15 +129,6 @@ This query needs more than one minute to complete.
 # Find all subwatersheds with "Black Fork" in the name
 where = "name LIKE '%Black Fork%'"
 subwatersheds = get_features(url, where)
-```
-
-#### Example 4: Find all subwatersheds upstream of the Muskingum River
-
-Cut and paste the following code. Don't make any changes. We have our own way to calculate all subwatersheds upstream. Don't use your way to calculate it. 
-
-```python
-import utils as get_upstream_subwatersheds
-upstream_subwatersheds = get_upstream_subwatersheds(muskingum_river_gdf)
 ```
 
 ## Notes
