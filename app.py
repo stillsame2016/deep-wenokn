@@ -983,13 +983,13 @@ if st.session_state.current_view == "sample":
                 * Find all watersheds within the Kanawha Basin.
                 * Find all sub-watersheds that intersect the Scioto River.
                 """)
-    st.markdown("#### Demographics, Economics, Health, Education and Other Societal Topics via Google Data Commons")
+    st.markdown("#### Demographics, Economics, Health, Education via Google Data Commons")
     st.markdown("""
-                * Show the populations for all counties in Ohio State.
-                * Find populations for all adjacent states to the state of Ohio.
+                * Show the population for all counties in the state of Ohio.
+                * Find the population for all states adjacent to the state of Ohio.
                 * Find the median individual income for Ross County and Scioto County.
-                * Find the number of people employed in all counties the Scioto River flows through.
-                * Show social vulnerability index of all counties downstream of coal mine with the name River View Mine along Ohio River.
+                * Find the number of people employed in all counties through which the Scioto River flows.
+                * Show the Social Vulnerability Index for all counties downstream of the coal mine named “River View Mine” along the Ohio River.
                 """)
     st.markdown("#### Assets at Risk of Flooding")
     st.markdown("""
