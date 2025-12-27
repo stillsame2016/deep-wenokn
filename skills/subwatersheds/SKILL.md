@@ -36,6 +36,7 @@ Use this skill to:
 - Find objects within a subwatershed
 - Find subwatersheds that meet specific spatial conditions (e.g., intersecting a county or region)
 - Query subwatersheds by their attributes (huc12 code, area, states, etc.)
+- Find all subwatersheds upstream of a river (See Example 4)
 
 ## How to Use
 
