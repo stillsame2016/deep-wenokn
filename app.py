@@ -981,6 +981,8 @@ if st.session_state.current_view == "sample":
                 * Find all basins through which the Scioto River flows.
                 * Find all rivers that flow through the Roanoke Basin.
                 * Find all watersheds within the Kanawha Basin.
+                * Find all sub-watersheds that intersect the Scioto River.
+                * Find all sub-watersheds upstream of the Scioto River.
                 """)
 elif st.session_state.current_view == "map":
     
