@@ -152,6 +152,8 @@ def get_upstream_subwatersheds(river_gdf):
     of all upstream HUC12 sub-watersheds using the USGS WBD HUC12
     ArcGIS Feature Service.
     """
+    HUC12_FS_URL = "https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/Watershed_Boundary_Dataset_HUC_12s/FeatureServer/0"
+        
     # 1. Ensure CRS is EPSG:4326
     if river_gdf.crs is None:
         raise ValueError("river_gdf must have a CRS defined")
