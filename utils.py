@@ -7,10 +7,13 @@ data from the SAWGraph knowledge graph.
 DO NOT MODIFY THIS FILE - Functions are validated against specific SPARQL endpoints.
 """
 
+import json
+import requests
 import geopandas as gpd
 import sparql_dataframe
 from shapely import wkt
-
+from shapely.ops import linemerge
+from shapely.geometry import Point
 
 def load_FRS_facilities(state: str, naics_name: str, limit: int = 1000) -> gpd.GeoDataFrame:
     """
@@ -141,3 +144,92 @@ LIMIT {limit}
 
     # Return as GeoDataFrame with WGS84 coordinate system
     return gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
+
+
+def get_upstream_subwatersheds(river_gdf):
+    """
+    Given a GeoDataFrame containing a river geometry, return a GeoDataFrame
+    of all upstream HUC12 sub-watersheds using the USGS WBD HUC12
+    ArcGIS Feature Service.
+    """
+    # 1. Ensure CRS is EPSG:4326
+    if river_gdf.crs is None:
+        raise ValueError("river_gdf must have a CRS defined")
+    if river_gdf.crs.to_epsg() != 4326:
+        river_gdf = river_gdf.to_crs(epsg=4326)
+    
+    # 2. Get downstream outlet point of the river
+    merged = linemerge(river_gdf.geometry.values)
+    # Handle both LineString and MultiLineString
+    if merged.geom_type == 'LineString':
+        outlet_point = Point(merged.coords[-1])
+    elif merged.geom_type == 'MultiLineString':
+        # Use the last point of the last line
+        outlet_point = Point(list(merged.geoms)[-1].coords[-1])
+    else:
+        raise ValueError(f"Unexpected geometry type: {merged.geom_type}")
+    
+    # 3. Find terminal HUC12 containing the outlet point
+    params = {
+        "geometry": json.dumps({
+            "x": outlet_point.x,
+            "y": outlet_point.y,
+            "spatialReference": {"wkid": 4326}
+        }),
+        "geometryType": "esriGeometryPoint",
+        "spatialRel": "esriSpatialRelWithin",
+        "outFields": "HUC12,TOHUC",
+        "f": "json"
+    }
+    r = requests.get(HUC12_FS_URL, params=params)
+    r.raise_for_status()
+    features = r.json().get("features", [])
+    if not features:
+        raise RuntimeError("No HUC12 found for river outlet")
+    terminal_huc12 = features[0]["attributes"]["HUC12"]
+    
+    # 4. Traverse upstream HUC12s using TOHUC
+    # Use a queue to track HUCs to process
+    upstream = {terminal_huc12}
+    to_process = [terminal_huc12]
+    
+    while to_process:
+        current_huc = to_process.pop(0)
+        
+        # Find all HUC12s that drain TO this one (upstream neighbors)
+        params = {
+            "where": f"TOHUC = '{current_huc}'",
+            "outFields": "HUC12,TOHUC",
+            "f": "json"
+        }
+        r = requests.get(HUC12_FS_URL, params=params)
+        r.raise_for_status()
+        
+        for feat in r.json().get("features", []):
+            h = feat["attributes"]["HUC12"]
+            if h not in upstream:
+                upstream.add(h)
+                to_process.append(h)
+    
+    # 5. Fetch geometries for all upstream HUC12s (batched)
+    def chunks(lst, n=50):
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
+    
+    all_features = []
+    for batch in chunks(list(upstream)):
+        where = "HUC12 IN ({})".format(",".join(f"'{h}'" for h in batch))
+        params = {
+            "where": where,
+            "outFields": "*",
+            "outSR": 4326,
+            "f": "geojson"
+        }
+        r = requests.get(HUC12_FS_URL, params=params)
+        r.raise_for_status()
+        all_features.extend(r.json()["features"])
+    
+    # 6. Convert to GeoDataFrame
+    huc12_gdf = gpd.GeoDataFrame.from_features(all_features, crs="EPSG:4326")
+    return huc12_gdf
+
