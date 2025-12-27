@@ -149,8 +149,7 @@ LIMIT {limit}
 def get_upstream_subwatersheds(river_gdf):
     """
     Given a GeoDataFrame containing a river geometry, return a GeoDataFrame
-    of all upstream HUC12 sub-watersheds using the USGS WBD HUC12
-    ArcGIS Feature Service.
+    of all upstream HUC12 sub-watersheds that drain into this river.
     """
     HUC12_FS_URL = "https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/Watershed_Boundary_Dataset_HUC_12s/FeatureServer/0/query"
         
@@ -160,17 +159,15 @@ def get_upstream_subwatersheds(river_gdf):
     if river_gdf.crs.to_epsg() != 4326:
         river_gdf = river_gdf.to_crs(epsg=4326)
     
-    # 2. Get the river geometry
     river_geom = river_gdf.geometry.iloc[0]
     river_name = river_gdf['riverName'].iloc[0] if 'riverName' in river_gdf.columns else "Unknown River"
     
-    print(f"Finding watersheds for: {river_name}")
-    print(f"River bounds: {river_gdf.total_bounds}")
+    print(f"Finding upstream watersheds for: {river_name}")
     
-    # 3. Query all HUC12s that intersect the river geometry
+    # 2. Find ALL HUC12s that the river flows through
     print("\nQuerying HUC12s that intersect the river...")
     
-    bounds = river_gdf.total_bounds  # minx, miny, maxx, maxy
+    bounds = river_gdf.total_bounds
     params = {
         "geometry": json.dumps({
             "xmin": bounds[0],
@@ -197,23 +194,16 @@ def get_upstream_subwatersheds(river_gdf):
     features = data.get("features", [])
     print(f"Found {len(features)} HUC12s in river bounds")
     
-    if not features:
-        raise RuntimeError("No HUC12s found intersecting river bounds")
-    
     # Convert to GeoDataFrame
     all_hucs_gdf = gpd.GeoDataFrame.from_features(data, crs="EPSG:4326")
     
-    # 4. Find which HUC12s actually intersect the river line
+    # Find HUC12s that actually intersect the river line
     all_hucs_gdf['intersects_river'] = all_hucs_gdf.geometry.intersects(river_geom)
     river_hucs = all_hucs_gdf[all_hucs_gdf['intersects_river']].copy()
     
-    print(f"Found {len(river_hucs)} HUC12s that intersect the river geometry")
+    print(f"Found {len(river_hucs)} HUC12s that intersect the river")
     
-    if len(river_hucs) == 0:
-        raise RuntimeError("No HUC12s intersect the river geometry")
-    
-    # 5. Identify the primary watershed by finding the most common HUC prefix
-    # Group by HUC8 (first 8 digits) to find the main watershed
+    # 3. Identify the primary watershed using HUC8
     river_hucs['huc8'] = river_hucs['huc12'].str[:8]
     huc8_counts = river_hucs['huc8'].value_counts()
     
@@ -221,37 +211,51 @@ def get_upstream_subwatersheds(river_gdf):
     for huc8, count in huc8_counts.items():
         print(f"  {huc8}: {count} HUC12s")
     
-    # Use the HUC8 with the most HUC12s as the primary watershed
+    # The primary watershed is the one with the most HUC12s
     primary_huc8 = huc8_counts.idxmax()
     print(f"\nPrimary watershed: HUC8 {primary_huc8}")
     
-    # Filter to only HUC12s in the primary watershed
-    river_hucs_filtered = river_hucs[river_hucs['huc8'] == primary_huc8].copy()
-    print(f"Filtered to {len(river_hucs_filtered)} HUC12s in primary watershed")
+    # 4. Filter to only the primary watershed
+    river_hucs_primary = river_hucs[river_hucs['huc8'] == primary_huc8].copy()
+    print(f"Filtered to {len(river_hucs_primary)} HUC12s in primary watershed")
     
-    river_huc_codes = set(river_hucs_filtered['huc12'].values)
+    primary_huc_codes = set(river_hucs_primary['huc12'].values)
     
-    # 6. Find the most downstream HUC12 in the primary watershed
-    terminal_candidates = []
-    for idx, row in river_hucs_filtered.iterrows():
+    # 5. Find the most downstream HUC12 within the primary watershed
+    # This is the one whose TOHUC is NOT in the primary watershed set
+    terminal_huc12 = None
+    
+    for idx, row in river_hucs_primary.iterrows():
         tohuc = row.get('tohuc', '')
-        # Terminal if TOHUC is empty, or points outside the primary watershed
-        if not tohuc or str(tohuc).strip() == '' or tohuc not in river_huc_codes:
-            terminal_candidates.append(row)
+        # Check if TOHUC points outside the primary watershed
+        if tohuc and str(tohuc).strip() != '' and tohuc not in primary_huc_codes:
+            terminal_huc12 = row['huc12']
+            terminal_name = row.get('name', 'N/A')
+            terminal_tohuc = tohuc
+            print(f"\n✓ Found terminal HUC12: {terminal_huc12} - {terminal_name}")
+            print(f"  TOHUC: {terminal_tohuc} (outside primary watershed)")
+            break
     
-    if terminal_candidates:
-        terminal_huc12 = terminal_candidates[0]['huc12']
-        terminal_name = terminal_candidates[0].get('name', 'N/A')
-        print(f"\nTerminal HUC12: {terminal_huc12} - {terminal_name}")
-    else:
-        print(f"\nNo clear terminal found, using all {len(river_huc_codes)} HUC12s as starting points")
+    if not terminal_huc12:
+        # Fallback: use the HUC12 closest to the outlet
+        if river_geom.geom_type == 'LineString':
+            outlet_point = Point(river_geom.coords[-1])
+        elif river_geom.geom_type == 'MultiLineString':
+            outlet_point = Point(list(river_geom.geoms)[-1].coords[-1])
+        else:
+            raise ValueError(f"Unsupported geometry type: {river_geom.geom_type}")
+        
+        river_hucs_primary['dist_to_outlet'] = river_hucs_primary.geometry.distance(outlet_point)
+        terminal_huc12 = river_hucs_primary.loc[river_hucs_primary['dist_to_outlet'].idxmin(), 'huc12']
+        terminal_name = river_hucs_primary.loc[river_hucs_primary['dist_to_outlet'].idxmin(), 'name']
+        print(f"\n✓ Using closest HUC12 as terminal: {terminal_huc12} - {terminal_name}")
     
-    # 7. Start with all HUC12s that the river touches in the primary watershed
-    upstream = river_huc_codes.copy()
-    to_process = list(river_huc_codes)
+    # 6. Traverse UPSTREAM from the terminal HUC12
+    print(f"\nTraversing upstream from terminal HUC12: {terminal_huc12}")
+    
+    upstream = {terminal_huc12}
+    to_process = [terminal_huc12]
     processed = set()
-    
-    print(f"\nTraversing upstream from {len(river_huc_codes)} river HUC12s...")
     
     max_iterations = 10000
     iteration = 0
@@ -268,7 +272,7 @@ def get_upstream_subwatersheds(river_gdf):
         if iteration % 100 == 0:
             print(f"  Processed {iteration} nodes, found {len(upstream)} watersheds...")
         
-        # Find all HUC12s that drain TO this one
+        # Find all HUC12s that drain TO the current HUC12
         params = {
             "where": f"tohuc = '{current_huc}'",
             "outFields": "huc12,tohuc",
@@ -280,27 +284,29 @@ def get_upstream_subwatersheds(river_gdf):
             r = requests.get(HUC12_FS_URL, params=params, timeout=30)
             r.raise_for_status()
             
-            for feat in r.json().get("features", []):
+            upstream_neighbors = r.json().get("features", [])
+            
+            for feat in upstream_neighbors:
                 h = feat["attributes"]['huc12']
-                # Only include if it's in the same HUC8 watershed
+                # Only include HUC12s in the primary watershed
                 if h.startswith(primary_huc8) and h not in upstream:
                     upstream.add(h)
                     to_process.append(h)
+                    
         except Exception as e:
             print(f"Warning: Failed to get upstream HUCs for {current_huc}: {e}")
     
-    if iteration >= max_iterations:
-        print(f"Warning: Reached maximum iteration limit")
+    print(f"\nFound {len(upstream)} total upstream HUC12 watersheds in HUC8 {primary_huc8}")
     
-    print(f"Found {len(upstream)} total upstream HUC12 watersheds in HUC8 {primary_huc8}")
-    
-    # 8. Fetch geometries for all upstream HUC12s
+    # 7. Fetch geometries
     def chunks(lst, n=20):
         for i in range(0, len(lst), n):
             yield lst[i:i + n]
     
     all_features = []
     batch_num = 0
+    
+    print("\nFetching geometries...")
     for batch in chunks(list(upstream)):
         batch_num += 1
         where = f"huc12 IN ({','.join(repr(h) for h in batch)})"
@@ -324,6 +330,5 @@ def get_upstream_subwatersheds(river_gdf):
     
     print(f"Total features retrieved: {len(all_features)}")
     
-    # 9. Convert to GeoDataFrame
     huc12_gdf = gpd.GeoDataFrame.from_features(all_features, crs="EPSG:4326")
     return huc12_gdf
