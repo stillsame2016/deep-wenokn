@@ -975,7 +975,7 @@ if st.session_state.current_view == "sample":
                 """)
     st.markdown("#### Hydrologic Basins, Watersheds, and Sub-Watersheds (HUC 8, 10, 12)")
     st.markdown("""
-                * Find the hydrologic basin that contains the Scioto River outlet.
+                * Find the hydrologic basin that contains the Scioto River outlet and save the basin as GeoJSON.
                 * Find all hydrological basins that intersect the state of Ohio.
                 * Find all counties that intersect the Lower Ohio–Salt Basin.
                 * Find all basins through which the Scioto River flows.
