@@ -15,15 +15,18 @@ https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/Watershed_Boun
 
 The service returns the following columns:
 
-- **objectid**: System-assigned unique identifier for each subwatershed feature in the service
-- **areaacres**: Total area of the subwatershed measured in acres
-- **areasqkm**: Total area of the subwatershed measured in square kilometers
-- **states**: U.S. states that the subwatershed intersects or lies within (e.g., "IN,KY,OH" - a concatenation of state abbreviations)
-- **huc10**: Ten-digit Hydrologic Unit Code identifying the subwatershed
-- **name**: Official or commonly used name of the subwatershed
-- **globalid**: Globally unique identifier used to track the feature across databases and services
-- **Shape__Area**: System-calculated area of the subwatershed geometry in the feature service's coordinate system
-- **Shape__Length**: System-calculated perimeter length of the subwatershed geometry in the feature service's coordinate system
+- **objectid**: Unique system-generated identifier for each subwatershed feature.
+- **areaacres**: Total subwatershed area in acres.
+- **areasqkm**: Total subwatershed area in square kilometers.
+- **states**: U.S. state(s) in which the subwatershed is located.
+- **huc12**: 12-digit Hydrologic Unit Code identifying the subwatershed.
+- **name**: Official name of the subwatershed.
+- **tohuc**: Downstream HUC that this subwatershed drains into.
+- **noncontributingareaacres**: Area in acres that does not contribute surface runoff.
+- **noncontributingareasqkm**: Area in square kilometers that does not contribute surface runoff.
+- **globalid**: Globally unique identifier for the feature.
+- **Shape__Area**: Geometry-derived area of the subwatershed.
+- **Shape__Length**: Geometry-derived perimeter length of the subwatershed.
 
 ## When to Use
 
@@ -31,8 +34,8 @@ Use this skill to:
 
 - Find a subwatershed by name
 - Find objects within a subwatershed
-- Find subwatersheds that meet specific spatial conditions (e.g., intersecting a state or region)
-- Query subwatersheds by their attributes (HUC10 code, area, states, etc.)
+- Find subwatersheds that meet specific spatial conditions (e.g., intersecting a county or region)
+- Query subwatersheds by their attributes (huc12 code, area, states, etc.)
 
 ## How to Use
 
