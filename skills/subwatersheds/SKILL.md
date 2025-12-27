@@ -131,6 +131,21 @@ where = "name LIKE '%Black Fork%'"
 subwatersheds = get_features(url, where)
 ```
 
+#### Example 4: Find all subwatersheds upstream of the Muskingum River
+
+```python
+import geopandas as gpd
+from shapely.geometry import Point
+from shapely.ops import linemerge
+
+river_gdf = ...
+line = linemerge(river_gdf.geometry.values)
+outlet_point = Point(line.coords[-1])
+outlet_gdf = gpd.GeoDataFrame(geometry=[outlet_point], crs=river_gdf.crs)
+
+
+```
+
 ## Notes
 
 Fetching all subwatersheds in a state may take about one minute.
