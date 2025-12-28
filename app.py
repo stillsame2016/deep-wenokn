@@ -990,7 +990,7 @@ if st.session_state.current_view == "sample":
                 * Find the population for all states adjacent to the state of Ohio.
                 * Find the median individual income for Ross County and Scioto County.
                 * Find the number of people employed in all counties through which the Scioto River flows.
-                * Show the Social Vulnerability Index for all counties downstream of the coal mine named “River View Mine” along the Ohio River.
+                * Show the Social Vulnerability Index for all counties downstream of the coal mine named "River View Mine" along the Ohio River.
                 """)
     st.markdown("#### Assets at Risk of Flooding")
     st.markdown("""
